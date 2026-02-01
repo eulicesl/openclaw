@@ -38,10 +38,11 @@ struct DevicePairingView: View {
                     .autocorrectionDisabled()
                     .font(.system(.body, design: .monospaced))
                     .onChange(of: self.pairingCode) { _, newValue in
-                        // Sanitize input: uppercase, alphanumeric only, max 8 chars
+                        // Sanitize input: uppercase, alphanumeric only, no ambiguous chars, max 8 chars
+                        // Filter out 0, O, 1, I, L to match validation logic in isValidPairingCode
                         self.pairingCode = String(
                             newValue.uppercased()
-                                .filter { $0.isLetter || $0.isNumber }
+                                .filter { ($0.isLetter || $0.isNumber) && !"0O1IL".contains($0) }
                                 .prefix(8)
                         )
                     }
@@ -125,7 +126,11 @@ struct DevicePairingView: View {
                 // The gateway method "device.pair.verify" expects:
                 // - code: the 8-character pairing code
                 // Returns success if the code matches a pending pairing request.
-                let paramsJSON = "{\"code\":\"\(self.pairingCode)\"}"
+                let paramsPayload = ["code": self.pairingCode]
+                let paramsData = try JSONEncoder().encode(paramsPayload)
+                guard let paramsJSON = String(data: paramsData, encoding: .utf8) else {
+                    throw PairingError.invalidCodeFormat
+                }
                 let _ = try await gateway.request(
                     method: "device.pair.verify",
                     paramsJSON: paramsJSON,
