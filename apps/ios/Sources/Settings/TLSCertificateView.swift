@@ -164,50 +164,60 @@ struct TLSCertificateView: View {
     ///
     /// The certificates are stored in UserDefaults with a specific suite name and key prefix.
     /// This method enumerates all keys matching the TLS certificate pattern.
+    /// Loading is performed on a background thread to avoid blocking the UI.
     private func loadCertificates() {
         self.isLoading = true
         
-        // Access the shared UserDefaults suite used by GatewayTLSStore
-        let suiteName = "bot.molt.shared"
-        let keyPrefix = "gateway.tls."
-        
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            self.isLoading = false
-            return
-        }
-        
-        var loadedCerts: [StoredCertificate] = []
-        let allKeys = defaults.dictionaryRepresentation().keys
-        
-        for key in allKeys where key.hasPrefix(keyPrefix) {
-            guard let fingerprint = defaults.string(forKey: key),
-                  !fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                continue
+        // Perform certificate enumeration on background thread
+        Task.detached(priority: .userInitiated) {
+            // Access the shared UserDefaults suite used by GatewayTLSStore
+            let suiteName = "bot.molt.shared"
+            let keyPrefix = "gateway.tls."
+            
+            guard let defaults = UserDefaults(suiteName: suiteName) else {
+                await MainActor.run {
+                    self.isLoading = false
+                }
+                return
             }
             
-            let stableID = String(key.dropFirst(keyPrefix.count))
-            let cert = StoredCertificate(
-                id: key,
-                stableID: stableID,
-                fingerprint: fingerprint.trimmingCharacters(in: .whitespacesAndNewlines),
-                // Note: GatewayTLSStore doesn't store dates, so we use a placeholder
-                addedDate: Date.distantPast
-            )
-            loadedCerts.append(cert)
-        }
-        
-        // Sort by stableID for consistent display
-        self.certificates = loadedCerts.sorted { $0.stableID < $1.stableID }
-        self.isLoading = false
-        
-        // Log the certificate load for security audit
-        if !loadedCerts.isEmpty {
-            Task { @MainActor in
-                SecurityAuditLogger.shared.log(
-                    .tlsVerification,
-                    details: "Loaded \(loadedCerts.count) pinned certificate(s)",
-                    severity: .info
+            var loadedCerts: [StoredCertificate] = []
+            let allKeys = defaults.dictionaryRepresentation().keys
+            
+            for key in allKeys where key.hasPrefix(keyPrefix) {
+                guard let fingerprint = defaults.string(forKey: key),
+                      !fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    continue
+                }
+                
+                let stableID = String(key.dropFirst(keyPrefix.count))
+                let cert = StoredCertificate(
+                    id: key,
+                    stableID: stableID,
+                    fingerprint: fingerprint.trimmingCharacters(in: .whitespacesAndNewlines),
+                    // Note: GatewayTLSStore doesn't store dates, so we use a placeholder
+                    addedDate: Date.distantPast
                 )
+                loadedCerts.append(cert)
+            }
+            
+            // Sort by stableID for consistent display
+            let sortedCerts = loadedCerts.sorted { $0.stableID < $1.stableID }
+            let certCount = loadedCerts.count
+            
+            // Update UI on main thread
+            await MainActor.run {
+                self.certificates = sortedCerts
+                self.isLoading = false
+                
+                // Log the certificate load for security audit
+                if certCount > 0 {
+                    SecurityAuditLogger.shared.log(
+                        .tlsVerification,
+                        details: "Loaded \(certCount) pinned certificate(s)",
+                        severity: .info
+                    )
+                }
             }
         }
     }
