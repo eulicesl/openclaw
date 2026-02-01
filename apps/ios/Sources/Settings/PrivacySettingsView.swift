@@ -100,15 +100,25 @@ struct PrivacySettingsView: View {
         }
         .navigationTitle("Privacy & Security")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Permission Required", isPresented: self.$showPermissionDeniedAlert) {
-            Button("Open Settings") {
+        .alert(
+            NSLocalizedString("privacy.permissionRequired", value: "Permission Required", comment: "Alert title when system permission is denied"),
+            isPresented: self.$showPermissionDeniedAlert
+        ) {
+            Button(NSLocalizedString("privacy.openSettings", value: "Open Settings", comment: "Button to open iOS Settings")) {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsURL)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
-            Text("\(self.deniedPermissionType) access is denied at the system level. Please enable it in Settings to use this feature.")
+            Text(String(
+                format: NSLocalizedString(
+                    "privacy.permissionDenied.message",
+                    value: "%@ access is denied at the system level. Please enable it in Settings to use this feature.",
+                    comment: "Alert message explaining permission is denied. %@ is replaced with permission type (e.g., Camera, Microphone)"
+                ),
+                self.deniedPermissionType
+            ))
         }
     }
     
