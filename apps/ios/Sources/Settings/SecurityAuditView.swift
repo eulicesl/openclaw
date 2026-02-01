@@ -89,18 +89,18 @@ final class SecurityAuditLogger {
         var result = input
         
         // Redact tokens (long alphanumeric strings, typically 32+ chars)
+        // Using try! since the pattern is a compile-time constant - any regex error should fail fast
         let tokenPattern = #"\b[A-Za-z0-9_-]{32,}\b"#
-        if let regex = try? NSRegularExpression(pattern: tokenPattern) {
-            let range = NSRange(result.startIndex..., in: result)
-            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: "[REDACTED]")
-        }
+        let tokenRegex = try! NSRegularExpression(pattern: tokenPattern)
+        let tokenRange = NSRange(result.startIndex..., in: result)
+        result = tokenRegex.stringByReplacingMatches(in: result, range: tokenRange, withTemplate: "[REDACTED]")
         
         // Truncate fingerprints (64-char hex strings) to first 8 chars
+        // Using try! since the pattern is a compile-time constant - any regex error should fail fast
         let fingerprintPattern = #"\b([a-fA-F0-9]{8})[a-fA-F0-9]{56}\b"#
-        if let regex = try? NSRegularExpression(pattern: fingerprintPattern) {
-            let range = NSRange(result.startIndex..., in: result)
-            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: "$1...")
-        }
+        let fingerprintRegex = try! NSRegularExpression(pattern: fingerprintPattern)
+        let fingerprintRange = NSRange(result.startIndex..., in: result)
+        result = fingerprintRegex.stringByReplacingMatches(in: result, range: fingerprintRange, withTemplate: "$1...")
         
         return result
     }
