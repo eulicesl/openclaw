@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 struct SecurityAuditEvent: Identifiable, Codable {
@@ -107,19 +108,30 @@ final class SecurityAuditLogger {
     
     // MARK: - Secure File Storage
     
+    private static let logger = Logger(subsystem: "bot.molt", category: "SecurityAudit")
+    
     /// Returns the URL for the secure audit log file.
     /// The file is stored in the app's Library/Application Support directory
-    /// with complete file protection (encrypted when device is locked).
+    /// with file protection until first user authentication (allows background access).
     private static var auditLogFileURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let securityDir = appSupport.appendingPathComponent("SecurityAudit", isDirectory: true)
+        // Use guard-let to safely unwrap directory URLs with fallbacks
+        let baseDir: URL
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            baseDir = appSupport
+        } else if let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+            baseDir = libraryDir
+        } else {
+            baseDir = FileManager.default.temporaryDirectory
+        }
+        
+        let securityDir = baseDir.appendingPathComponent("SecurityAudit", isDirectory: true)
         
         // Ensure directory exists with appropriate protection
         if !FileManager.default.fileExists(atPath: securityDir.path) {
             try? FileManager.default.createDirectory(at: securityDir, withIntermediateDirectories: true)
-            // Set directory protection
+            // Use completeFileProtectionUntilFirstUserAuthentication to allow background logging
             try? FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.complete],
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: securityDir.path
             )
         }
@@ -138,13 +150,18 @@ final class SecurityAuditLogger {
     }
     
     private func saveEvents() {
-        guard let data = try? JSONEncoder().encode(self.events) else { return }
+        guard let data = try? JSONEncoder().encode(self.events) else {
+            Self.logger.error("Failed to encode security audit events")
+            return
+        }
         let fileURL = Self.auditLogFileURL
         
         do {
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            // Use completeUntilFirstUserAuthentication to allow background writes
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
-            // Silently fail - security logs are non-critical
+            // Log to OSLog so failures are visible in Console/diagnostics
+            Self.logger.error("Failed to save security audit events: \(error.localizedDescription, privacy: .public)")
         }
     }
 }
