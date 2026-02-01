@@ -7,7 +7,6 @@ struct PermissionsView: View {
     
     @State private var showingPermissionAlert = false
     @State private var currentPermission: PermissionType?
-    @State private var permissionStatuses: [PermissionType: Bool] = [:]
     
     private enum PermissionType: String, CaseIterable {
         case microphone
@@ -127,35 +126,23 @@ struct PermissionsView: View {
     private func requestPermission(_ permission: PermissionType) {
         switch permission {
         case .microphone:
-            // Request microphone access
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                Task { @MainActor in
-                    self.permissionStatuses[.microphone] = granted
-                }
-            }
+            // Request microphone access - the callback result is intentionally
+            // not stored as the permission will be checked when actually needed
+            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
             
         case .camera:
             // Request camera access
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                Task { @MainActor in
-                    self.permissionStatuses[.camera] = granted
-                }
-            }
+            AVCaptureDevice.requestAccess(for: .video) { _ in }
             
         case .localNetwork:
             // Local network permission is requested automatically when
-            // the app attempts to use Bonjour/NWBrowser. We mark it as
-            // "granted" here since there's no direct API to request it.
-            // The actual permission prompt appears when network access is first attempted.
-            self.permissionStatuses[.localNetwork] = true
+            // the app attempts to use Bonjour/NWBrowser. There's no direct API
+            // to request it - the prompt appears when network access is first attempted.
+            break
             
         case .notifications:
             // Request notification access
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-                Task { @MainActor in
-                    self.permissionStatuses[.notifications] = granted
-                }
-            }
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
         }
     }
 }
