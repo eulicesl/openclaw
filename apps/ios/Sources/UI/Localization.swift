@@ -48,6 +48,14 @@ enum L10n {
         static let close = NSLocalizedString("accessibility.close.button", comment: "Close button label")
     }
     
+    // Errors
+    enum Errors {
+        static let generic = NSLocalizedString("error.generic", comment: "Generic error message")
+        static let connectionFailed = NSLocalizedString("error.connectionFailed", comment: "Connection failed error")
+        static let permissionDenied = NSLocalizedString("error.permissionDenied", comment: "Permission denied error")
+        static let retry = NSLocalizedString("error.retry", comment: "Retry button")
+    }
+    
     // Common
     enum Common {
         static let cancel = NSLocalizedString("common.cancel", comment: "Cancel button")
