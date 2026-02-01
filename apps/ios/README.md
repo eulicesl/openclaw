@@ -152,6 +152,25 @@ Full support for:
 - Regenerate: `xcodegen generate`
 - Update tools: `brew upgrade xcodegen swiftlint`
 
+## Security & Compliance
+
+Moltbot iOS implements industry-standard security practices:
+
+- **TLS Certificate Pinning** (TOFU) for all gateway connections
+- **Keychain Storage** for all credentials and tokens
+- **No Third-Party Tracking** - Privacy-first architecture
+- **Device Pairing** with 8-character codes
+- **Security Audit Log** for transparency
+
+### Security Documentation
+
+- [SECURITY.md](SECURITY.md) - Complete security architecture
+- [SECURITY_QUICK_REFERENCE.md](SECURITY_QUICK_REFERENCE.md) - Quick answers
+- [PRODUCTION_READINESS_REVIEW.md](PRODUCTION_READINESS_REVIEW.md) - Production assessment
+- [AppStore/SUBMISSION_CHECKLIST.md](AppStore/SUBMISSION_CHECKLIST.md) - Pre-submission checklist
+- [AppStore/SECURITY_CHECKLIST.md](AppStore/SECURITY_CHECKLIST.md) - Security review
+- [docs/SECURITY_BEST_PRACTICES.md](docs/SECURITY_BEST_PRACTICES.md) - Developer guidelines
+
 ## Fastlane
 
 ```bash
@@ -164,11 +183,12 @@ See `fastlane/SETUP.md` for App Store Connect authentication and upload lanes.
 
 ## Links
 
-- [Documentation](https://docs.molt.bot)
-- [GitHub](https://github.com/steipete/moltbot)
+- [OpenClaw Docs](https://docs.openclaw.ai/)
+- [GitHub](https://github.com/openclaw/openclaw)
 - [Website](https://clawd.me)
-- [Privacy Policy](https://docs.molt.bot/privacy)
+- [Privacy Policy](https://docs.openclaw.ai/privacy)
+- [Security Contact]([[email protected]])
 
 ---
 
-Built with the Moltbot community
+Built with ❤️ by the OpenClaw community

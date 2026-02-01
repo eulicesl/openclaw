@@ -218,13 +218,33 @@ struct SettingsTab: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section {
+                Section("Security") {
                     NavigationLink {
                         PrivacySettingsView()
                     } label: {
                         Label("Privacy & Security", systemImage: "lock.shield.fill")
                     }
                     
+                    NavigationLink {
+                        TLSCertificateView()
+                    } label: {
+                        Label("TLS Certificates", systemImage: "lock.doc.fill")
+                    }
+                    
+                    NavigationLink {
+                        SecurityAuditView()
+                    } label: {
+                        Label("Security Audit", systemImage: "list.clipboard.fill")
+                    }
+                    
+                    NavigationLink {
+                        DevicePairingView()
+                    } label: {
+                        Label("Pair This Device", systemImage: "iphone.and.arrow.forward")
+                    }
+                }
+                
+                Section {
                     NavigationLink {
                         AboutView()
                     } label: {
