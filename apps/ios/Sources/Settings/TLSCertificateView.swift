@@ -222,9 +222,8 @@ struct TLSCertificateView: View {
             return
         }
         
-        // Remove from UserDefaults
+        // Remove from UserDefaults (synchronize() is unnecessary and discouraged in modern iOS)
         defaults.removeObject(forKey: cert.id)
-        defaults.synchronize()
         
         // Remove from local list
         self.certificates.removeAll { $0.id == cert.id }
