@@ -1,4 +1,6 @@
+import AVFoundation
 import SwiftUI
+import UserNotifications
 
 struct PermissionsView: View {
     let onComplete: () -> Void
@@ -122,21 +124,25 @@ struct PermissionsView: View {
     }
     
     private func requestPermission(_ permission: PermissionType) {
-        // This would trigger the actual system permission request
-        // Implementation depends on the specific permission
         switch permission {
         case .microphone:
-            // Request microphone access
-            break
+            // Request microphone access - the callback result is intentionally
+            // not stored as the permission will be checked when actually needed
+            AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+            
         case .camera:
             // Request camera access
-            break
+            AVCaptureDevice.requestAccess(for: .video) { _ in }
+            
         case .localNetwork:
-            // Local network is requested automatically
+            // Local network permission is requested automatically when
+            // the app attempts to use Bonjour/NWBrowser. There's no direct API
+            // to request it - the prompt appears when network access is first attempted.
             break
+            
         case .notifications:
             // Request notification access
-            break
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
         }
     }
 }

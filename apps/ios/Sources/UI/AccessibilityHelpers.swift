@@ -1,13 +1,14 @@
 import SwiftUI
 
 extension View {
-    /// Adds accessibility traits for a button with custom styling
+    /// Adds accessibility traits for a button with custom styling.
+    /// When disabled, the .isButton trait is removed to indicate non-interactivity.
     func accessibleButton(label: String, hint: String? = nil, isDisabled: Bool = false) -> some View {
         self
             .accessibilityLabel(label)
             .accessibilityHint(hint ?? "")
             .accessibilityAddTraits(.isButton)
-            .accessibilityRemoveTraits(isDisabled ? [] : .isButton)
+            .accessibilityRemoveTraits(isDisabled ? .isButton : [])
     }
     
     /// Adds accessibility support for a card that acts as a button

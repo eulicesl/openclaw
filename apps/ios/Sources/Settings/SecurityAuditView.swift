@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 
 struct SecurityAuditEvent: Identifiable, Codable {
@@ -62,8 +63,12 @@ final class SecurityAuditLogger {
         self.loadEvents()
     }
     
+    /// Logs a security event. The details parameter should NOT contain sensitive data
+    /// such as tokens, passwords, or full fingerprints. Use redacted/truncated values.
     func log(_ eventType: SecurityAuditEvent.EventType, details: String, severity: SecurityAuditEvent.Severity = .info) {
-        let event = SecurityAuditEvent(eventType: eventType, details: details, severity: severity)
+        // Redact potentially sensitive information from details
+        let redactedDetails = Self.redactSensitiveInfo(details)
+        let event = SecurityAuditEvent(eventType: eventType, details: redactedDetails, severity: severity)
         self.events.insert(event, at: 0)
         
         // Trim to max events
@@ -79,8 +84,65 @@ final class SecurityAuditLogger {
         self.saveEvents()
     }
     
+    /// Redacts potentially sensitive information from log details.
+    /// Tokens, fingerprints, and long hex strings are truncated.
+    private static func redactSensitiveInfo(_ input: String) -> String {
+        var result = input
+        
+        // Redact tokens (long alphanumeric strings, typically 32+ chars)
+        // Using try! since the pattern is a compile-time constant - any regex error should fail fast
+        let tokenPattern = #"\b[A-Za-z0-9_-]{32,}\b"#
+        let tokenRegex = try! NSRegularExpression(pattern: tokenPattern)
+        let tokenRange = NSRange(result.startIndex..., in: result)
+        result = tokenRegex.stringByReplacingMatches(in: result, range: tokenRange, withTemplate: "[REDACTED]")
+        
+        // Truncate fingerprints (64-char hex strings) to first 8 chars
+        // Using try! since the pattern is a compile-time constant - any regex error should fail fast
+        let fingerprintPattern = #"\b([a-fA-F0-9]{8})[a-fA-F0-9]{56}\b"#
+        let fingerprintRegex = try! NSRegularExpression(pattern: fingerprintPattern)
+        let fingerprintRange = NSRange(result.startIndex..., in: result)
+        result = fingerprintRegex.stringByReplacingMatches(in: result, range: fingerprintRange, withTemplate: "$1...")
+        
+        return result
+    }
+    
+    // MARK: - Secure File Storage
+    
+    private static let logger = Logger(subsystem: "bot.molt", category: "SecurityAudit")
+    
+    /// Returns the URL for the secure audit log file.
+    /// The file is stored in the app's Library/Application Support directory
+    /// with file protection until first user authentication (allows background access).
+    private static var auditLogFileURL: URL {
+        // Use guard-let to safely unwrap directory URLs with fallbacks
+        let baseDir: URL
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            baseDir = appSupport
+        } else if let libraryDir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first {
+            baseDir = libraryDir
+        } else {
+            baseDir = FileManager.default.temporaryDirectory
+        }
+        
+        let securityDir = baseDir.appendingPathComponent("SecurityAudit", isDirectory: true)
+        
+        // Ensure directory exists with appropriate protection
+        if !FileManager.default.fileExists(atPath: securityDir.path) {
+            try? FileManager.default.createDirectory(at: securityDir, withIntermediateDirectories: true)
+            // Use completeFileProtectionUntilFirstUserAuthentication to allow background logging
+            try? FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: securityDir.path
+            )
+        }
+        
+        return securityDir.appendingPathComponent("audit-events.json")
+    }
+    
     private func loadEvents() {
-        guard let data = UserDefaults.standard.data(forKey: "securityAuditEvents"),
+        let fileURL = Self.auditLogFileURL
+        guard FileManager.default.fileExists(atPath: fileURL.path),
+              let data = try? Data(contentsOf: fileURL),
               let events = try? JSONDecoder().decode([SecurityAuditEvent].self, from: data) else {
             return
         }
@@ -88,8 +150,19 @@ final class SecurityAuditLogger {
     }
     
     private func saveEvents() {
-        guard let data = try? JSONEncoder().encode(self.events) else { return }
-        UserDefaults.standard.set(data, forKey: "securityAuditEvents")
+        guard let data = try? JSONEncoder().encode(self.events) else {
+            Self.logger.error("Failed to encode security audit events")
+            return
+        }
+        let fileURL = Self.auditLogFileURL
+        
+        do {
+            // Use completeUntilFirstUserAuthentication to allow background writes
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch {
+            // Log to OSLog so failures are visible in Console/diagnostics
+            Self.logger.error("Failed to save security audit events: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
 

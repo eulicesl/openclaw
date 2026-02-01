@@ -95,7 +95,7 @@ struct ErrorView: View {
                 .foregroundStyle(.orange)
             
             VStack(spacing: 8) {
-                Text("Something Went Wrong")
+                Text(L10n.Errors.generic)
                     .font(.title3.bold())
                     .foregroundStyle(.primary)
                 
@@ -108,7 +108,7 @@ struct ErrorView: View {
             
             if let retry = self.retry {
                 Button(action: retry) {
-                    Text("Try Again")
+                    Text(L10n.Errors.retry)
                         .font(.headline)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 24)

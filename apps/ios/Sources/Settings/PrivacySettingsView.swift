@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 struct PrivacySettingsView: View {
@@ -5,6 +6,9 @@ struct PrivacySettingsView: View {
     @AppStorage(VoiceWakePreferences.enabledKey) private var voiceWakeEnabled = false
     @AppStorage("location.enabledMode") private var locationModeRaw = "off"
     @AppStorage("analytics.enabled") private var analyticsEnabled = false
+    
+    @State private var showPermissionDeniedAlert = false
+    @State private var deniedPermissionType: String = ""
     
     var body: some View {
         Form {
@@ -96,14 +100,80 @@ struct PrivacySettingsView: View {
         }
         .navigationTitle("Privacy & Security")
         .navigationBarTitleDisplayMode(.inline)
+        .alert(
+            NSLocalizedString("privacy.permissionRequired", value: "Permission Required", comment: "Alert title when system permission is denied"),
+            isPresented: self.$showPermissionDeniedAlert
+        ) {
+            Button(NSLocalizedString("privacy.openSettings", value: "Open Settings", comment: "Button to open iOS Settings")) {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button(L10n.Common.cancel, role: .cancel) {}
+        } message: {
+            Text(String(
+                format: NSLocalizedString(
+                    "privacy.permissionDenied.message",
+                    value: "%@ access is denied at the system level. Please enable it in Settings to use this feature.",
+                    comment: "Alert message explaining permission is denied. %@ is replaced with permission type (e.g., Camera, Microphone)"
+                ),
+                self.deniedPermissionType
+            ))
+        }
     }
     
     private func checkCameraPermission() {
-        // Implementation would check AVCaptureDevice authorization
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .notDetermined:
+            // Request permission
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                Task { @MainActor in
+                    if !granted {
+                        self.cameraEnabled = false
+                        self.deniedPermissionType = "Camera"
+                        self.showPermissionDeniedAlert = true
+                    }
+                }
+            }
+        case .denied, .restricted:
+            // Permission denied at system level, show alert to open Settings
+            self.cameraEnabled = false
+            self.deniedPermissionType = "Camera"
+            self.showPermissionDeniedAlert = true
+        case .authorized:
+            // Already authorized, nothing to do
+            break
+        @unknown default:
+            break
+        }
     }
     
     private func checkMicrophonePermission() {
-        // Implementation would check AVAudioSession authorization
+        let status = AVAudioSession.sharedInstance().recordPermission
+        switch status {
+        case .undetermined:
+            // Request permission
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                Task { @MainActor in
+                    if !granted {
+                        self.voiceWakeEnabled = false
+                        self.deniedPermissionType = "Microphone"
+                        self.showPermissionDeniedAlert = true
+                    }
+                }
+            }
+        case .denied:
+            // Permission denied at system level, show alert to open Settings
+            self.voiceWakeEnabled = false
+            self.deniedPermissionType = "Microphone"
+            self.showPermissionDeniedAlert = true
+        case .granted:
+            // Already authorized, nothing to do
+            break
+        @unknown default:
+            break
+        }
     }
 }
 
