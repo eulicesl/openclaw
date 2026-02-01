@@ -1,0 +1,79 @@
+/* Onboarding */
+"onboarding.welcome.title" = "Welcome to Moltbot";
+"onboarding.welcome.subtitle" = "Your Personal AI Assistant";
+"onboarding.welcome.feature.voiceWake" = "Voice Wake";
+"onboarding.welcome.feature.voiceWake.description" = "Activate hands-free with voice commands";
+"onboarding.welcome.feature.chat" = "Chat Interface";
+"onboarding.welcome.feature.chat.description" = "Natural conversation experience";
+"onboarding.welcome.feature.canvas" = "Canvas Mode";
+"onboarding.welcome.feature.canvas.description" = "Rich visual interactions and content";
+"onboarding.welcome.feature.privacy" = "Privacy First";
+"onboarding.welcome.feature.privacy.description" = "Your data stays on your gateway";
+"onboarding.welcome.continue" = "Continue";
+
+"onboarding.gateway.title" = "Connect to Gateway";
+"onboarding.gateway.subtitle" = "Moltbot will automatically discover gateways on your local network";
+"onboarding.gateway.noGateways" = "No Gateways Found";
+"onboarding.gateway.noGateways.message" = "Make sure your gateway is running and connected to the same network";
+"onboarding.gateway.manualSetup" = "Manual Setup";
+"onboarding.gateway.connect" = "Connect to %@";
+
+"onboarding.permissions.title" = "Permissions";
+"onboarding.permissions.subtitle" = "Moltbot needs a few permissions to work properly. You can always change these in Settings later.";
+"onboarding.permissions.microphone" = "Microphone";
+"onboarding.permissions.microphone.description" = "Required for Voice Wake and Talk Mode";
+"onboarding.permissions.camera" = "Camera";
+"onboarding.permissions.camera.description" = "Capture photos and videos on request";
+"onboarding.permissions.localNetwork" = "Local Network";
+"onboarding.permissions.localNetwork.description" = "Discover gateways on your network";
+"onboarding.permissions.notifications" = "Notifications";
+"onboarding.permissions.notifications.description" = "Stay updated with important alerts";
+"onboarding.permissions.required" = "Required";
+
+/* Settings */
+"settings.title" = "Settings";
+"settings.node.section" = "Node";
+"settings.gateway.section" = "Gateway";
+"settings.voice.section" = "Voice";
+"settings.camera.section" = "Camera";
+"settings.location.section" = "Location";
+"settings.screen.section" = "Screen";
+"settings.privacy.title" = "Privacy & Security";
+
+/* Privacy */
+"privacy.title" = "Privacy First";
+"privacy.subtitle" = "Your data stays on your gateway";
+"privacy.description" = "Moltbot processes all data on your self-hosted gateway. No information is sent to third-party servers without your explicit consent.";
+"privacy.permissions.title" = "Permissions";
+"privacy.camera.toggle" = "Camera Access";
+"privacy.microphone.toggle" = "Microphone (Voice Wake)";
+"privacy.location.picker" = "Location Sharing";
+"privacy.analytics.toggle" = "Usage Analytics";
+
+/* Status */
+"status.connected" = "Connected";
+"status.connecting" = "Connecting…";
+"status.disconnected" = "Offline";
+"status.error" = "Error";
+"status.voiceWake.enabled" = "Voice Wake enabled";
+"status.voiceWake.disabled" = "Voice Wake disabled";
+
+/* Accessibility Labels */
+"accessibility.chat.button" = "Chat";
+"accessibility.settings.button" = "Settings";
+"accessibility.talkMode.button" = "Talk Mode";
+"accessibility.close.button" = "Close";
+
+/* Errors */
+"error.generic" = "Something went wrong";
+"error.connectionFailed" = "Connection failed";
+"error.permissionDenied" = "Permission denied";
+"error.retry" = "Try Again";
+
+/* Common */
+"common.cancel" = "Cancel";
+"common.done" = "Done";
+"common.save" = "Save";
+"common.delete" = "Delete";
+"common.allow" = "Allow";
+"common.notNow" = "Not Now";

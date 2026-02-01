@@ -217,6 +217,20 @@ struct SettingsTab: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                Section {
+                    NavigationLink {
+                        PrivacySettingsView()
+                    } label: {
+                        Label("Privacy & Security", systemImage: "lock.shield.fill")
+                    }
+                    
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label("About", systemImage: "info.circle.fill")
+                    }
+                }
             }
             .navigationTitle("Settings")
             .toolbar {

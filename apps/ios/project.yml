@@ -31,6 +31,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Sources/PrivacyInfo.xcprivacy
     dependencies:
       - package: MoltbotKit
       - package: MoltbotKit

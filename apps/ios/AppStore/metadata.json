@@ -1,0 +1,14 @@
+{
+  "appName": "Moltbot",
+  "subtitle": "Your Personal AI Assistant",
+  "description": "Moltbot is a powerful personal AI assistant that connects to your gateway and provides seamless voice, chat, and canvas interactions. Built with privacy and security in mind, Moltbot runs entirely on your infrastructure.\n\nKey Features:\n• Voice Wake - Activate Moltbot hands-free with voice commands\n• Talk Mode - Have natural conversations with continuous listening\n• Canvas - Rich visual interactions and web content\n• Camera Integration - Capture photos and videos on request\n• Chat Interface - Clean, intuitive messaging experience\n• Gateway Discovery - Automatic local network detection via Bonjour\n• End-to-End Security - TLS encryption with certificate pinning\n• Privacy First - All data stays on your infrastructure\n\nMoltbot connects to your self-hosted gateway, ensuring complete control over your data and conversations. Perfect for developers, privacy-conscious users, and anyone who wants a powerful AI assistant without compromising security.",
+  "keywords": ["AI", "Assistant", "Voice", "Chat", "Privacy", "Gateway", "Voice Control", "Personal AI", "Automation", "Productivity"],
+  "category": "Productivity",
+  "contentRating": "4+",
+  "privacyPolicyURL": "https://docs.molt.bot/privacy",
+  "supportURL": "https://docs.molt.bot",
+  "marketingURL": "https://clawd.me",
+  "version": "2026.1.27-beta.1",
+  "copyright": "© 2026 Moltbot Community",
+  "releaseNotes": "Initial release with:\n• Voice Wake and Talk Mode\n• Gateway discovery and connection\n• Chat interface\n• Canvas rendering\n• Camera integration\n• Location services\n• Screen recording"
+}
