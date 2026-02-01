@@ -1,10 +1,16 @@
 import SwiftUI
 import MoltbotKit
 
+/// View for managing TLS certificate pinning (TOFU - Trust On First Use).
+///
+/// This view displays pinned certificates stored via `GatewayTLSStore` and allows
+/// users to view fingerprints and remove certificates when needed.
 struct TLSCertificateView: View {
     @State private var certificates: [StoredCertificate] = []
     @State private var showDeleteConfirmation: StoredCertificate?
+    @State private var isLoading = true
     
+    /// Represents a stored TLS certificate with its metadata.
     struct StoredCertificate: Identifiable {
         let id: String
         let stableID: String
@@ -17,6 +23,14 @@ struct TLSCertificateView: View {
             }
             return "Gateway \(self.stableID.prefix(8))..."
         }
+        
+        /// Returns a truncated fingerprint for display (first 16 chars + "...").
+        var truncatedFingerprint: String {
+            if self.fingerprint.count > 16 {
+                return String(self.fingerprint.prefix(16)) + "..."
+            }
+            return self.fingerprint
+        }
     }
     
     var body: some View {
@@ -27,7 +41,17 @@ struct TLSCertificateView: View {
                     .foregroundStyle(.secondary)
             }
             
-            if self.certificates.isEmpty {
+            if self.isLoading {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding()
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
+            } else if self.certificates.isEmpty {
                 Section {
                     HStack {
                         Spacer()
@@ -136,15 +160,83 @@ struct TLSCertificateView: View {
         }
     }
     
+    /// Loads all pinned certificates from the shared GatewayTLSStore.
+    ///
+    /// The certificates are stored in UserDefaults with a specific suite name and key prefix.
+    /// This method enumerates all keys matching the TLS certificate pattern.
     private func loadCertificates() {
-        // TODO: Load actual certificates from GatewayTLSStore
-        // For now, this is a placeholder
-        self.certificates = []
+        self.isLoading = true
+        
+        // Access the shared UserDefaults suite used by GatewayTLSStore
+        let suiteName = "bot.molt.shared"
+        let keyPrefix = "gateway.tls."
+        
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            self.isLoading = false
+            return
+        }
+        
+        var loadedCerts: [StoredCertificate] = []
+        let allKeys = defaults.dictionaryRepresentation().keys
+        
+        for key in allKeys where key.hasPrefix(keyPrefix) {
+            guard let fingerprint = defaults.string(forKey: key),
+                  !fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
+            }
+            
+            let stableID = String(key.dropFirst(keyPrefix.count))
+            let cert = StoredCertificate(
+                id: key,
+                stableID: stableID,
+                fingerprint: fingerprint.trimmingCharacters(in: .whitespacesAndNewlines),
+                // Note: GatewayTLSStore doesn't store dates, so we use a placeholder
+                addedDate: Date.distantPast
+            )
+            loadedCerts.append(cert)
+        }
+        
+        // Sort by stableID for consistent display
+        self.certificates = loadedCerts.sorted { $0.stableID < $1.stableID }
+        self.isLoading = false
+        
+        // Log the certificate load for security audit
+        if !loadedCerts.isEmpty {
+            Task { @MainActor in
+                SecurityAuditLogger.shared.log(
+                    .tlsVerification,
+                    details: "Loaded \(loadedCerts.count) pinned certificate(s)",
+                    severity: .info
+                )
+            }
+        }
     }
     
+    /// Deletes a pinned certificate from the TLS store.
+    ///
+    /// This removes the certificate fingerprint from UserDefaults, which means the
+    /// next connection to this gateway will trigger a new TOFU verification.
     private func deleteCertificate(_ cert: StoredCertificate) {
-        // TODO: Implement certificate deletion via GatewayTLSStore
+        let suiteName = "bot.molt.shared"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            return
+        }
+        
+        // Remove from UserDefaults
+        defaults.removeObject(forKey: cert.id)
+        defaults.synchronize()
+        
+        // Remove from local list
         self.certificates.removeAll { $0.id == cert.id }
+        
+        // Log the deletion for security audit
+        Task { @MainActor in
+            SecurityAuditLogger.shared.log(
+                .tlsVerification,
+                details: "Removed pinned certificate for \(cert.stableID.prefix(8))...",
+                severity: .warning
+            )
+        }
     }
 }
 
