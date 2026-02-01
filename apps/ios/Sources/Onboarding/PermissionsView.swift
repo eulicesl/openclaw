@@ -1,10 +1,13 @@
+import AVFoundation
 import SwiftUI
+import UserNotifications
 
 struct PermissionsView: View {
     let onComplete: () -> Void
     
     @State private var showingPermissionAlert = false
     @State private var currentPermission: PermissionType?
+    @State private var permissionStatuses: [PermissionType: Bool] = [:]
     
     private enum PermissionType: String, CaseIterable {
         case microphone
@@ -122,21 +125,37 @@ struct PermissionsView: View {
     }
     
     private func requestPermission(_ permission: PermissionType) {
-        // This would trigger the actual system permission request
-        // Implementation depends on the specific permission
         switch permission {
         case .microphone:
             // Request microphone access
-            break
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                Task { @MainActor in
+                    self.permissionStatuses[.microphone] = granted
+                }
+            }
+            
         case .camera:
             // Request camera access
-            break
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                Task { @MainActor in
+                    self.permissionStatuses[.camera] = granted
+                }
+            }
+            
         case .localNetwork:
-            // Local network is requested automatically
-            break
+            // Local network permission is requested automatically when
+            // the app attempts to use Bonjour/NWBrowser. We mark it as
+            // "granted" here since there's no direct API to request it.
+            // The actual permission prompt appears when network access is first attempted.
+            self.permissionStatuses[.localNetwork] = true
+            
         case .notifications:
             // Request notification access
-            break
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+                Task { @MainActor in
+                    self.permissionStatuses[.notifications] = granted
+                }
+            }
         }
     }
 }
