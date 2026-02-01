@@ -126,12 +126,15 @@ struct DevicePairingView: View {
                 // The gateway method "device.pair.verify" expects:
                 // - code: the 8-character pairing code
                 // Returns success if the code matches a pending pairing request.
+                // Note: The response is intentionally ignored because on success,
+                // the gateway automatically issues device tokens via the connect flow.
+                // The pairing verification only confirms the code is valid.
                 let paramsPayload = ["code": self.pairingCode]
                 let paramsData = try JSONEncoder().encode(paramsPayload)
                 guard let paramsJSON = String(data: paramsData, encoding: .utf8) else {
                     throw PairingError.invalidCodeFormat
                 }
-                let _ = try await gateway.request(
+                _ = try await gateway.request(
                     method: "device.pair.verify",
                     paramsJSON: paramsJSON,
                     timeoutSeconds: 30
@@ -161,7 +164,9 @@ struct DevicePairingView: View {
                     self.isLoading = false
                     // Don't expose internal error details to user
                     self.errorMessage = "Pairing failed. Please check the code and try again."
-                    self.logPairingEvent(success: false, details: "Pairing request failed")
+                    // Include error type for debugging while keeping sensitive details out
+                    let errorType = String(describing: type(of: error))
+                    self.logPairingEvent(success: false, details: "Pairing request failed: \(errorType)")
                 }
             }
         }
@@ -190,11 +195,16 @@ struct DevicePairingView: View {
 }
 
 /// Errors that can occur during device pairing.
+/// Note: codeExpired, codeNotFound, and alreadyPaired are reserved for future use
+/// when gateway response parsing is implemented to return specific error codes.
 private enum PairingError: Error {
     case gatewayNotConnected
     case invalidCodeFormat
+    /// Reserved: Gateway returns this when pairing code has expired (1 hour TTL)
     case codeExpired
+    /// Reserved: Gateway returns this when pairing code doesn't match any pending request
     case codeNotFound
+    /// Reserved: Gateway returns this when device is already paired
     case alreadyPaired
     
     var userFacingMessage: String {
