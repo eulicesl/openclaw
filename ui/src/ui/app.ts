@@ -246,6 +246,8 @@ export class OpenClawApp extends LitElement {
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
   @state() sessionsHideCron = true;
+  @state() sessionSwitcherSearch = "";
+  @state() sessionSwitcherGroups: Record<string, boolean> = {};
 
   @state() usageLoading = false;
   @state() usageResult: import("./types.js").SessionsUsageResult | null = null;

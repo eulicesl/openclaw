@@ -122,6 +122,21 @@ function renderCronFilterIcon(hiddenCount: number) {
   `;
 }
 
+/**
+ * Switch the active chat session — shared by the `<select>` dropdown
+ * and the sidebar session switcher.
+ */
+export function switchSession(state: AppViewState, nextKey: string) {
+  resetChatStateForSessionSwitch(state, nextKey);
+  void state.loadAssistantIdentity();
+  syncUrlWithSessionKey(
+    state as unknown as Parameters<typeof syncUrlWithSessionKey>[0],
+    nextKey,
+    true,
+  );
+  void loadChatHistory(state as unknown as ChatState);
+}
+
 export function renderChatControls(state: AppViewState) {
   const mainSessionKey = resolveMainSessionKey(state.hello, state.sessionsResult);
   const hideCron = state.sessionsHideCron ?? true;
@@ -174,31 +189,12 @@ export function renderChatControls(state: AppViewState) {
   `;
   return html`
     <div class="chat-controls">
-      <label class="field chat-controls__session">
+      <label class="field chat-controls__session chat-controls__session--switcher-active">
         <select
           .value=${state.sessionKey}
           ?disabled=${!state.connected}
           @change=${(e: Event) => {
-            const next = (e.target as HTMLSelectElement).value;
-            state.sessionKey = next;
-            state.chatMessage = "";
-            state.chatStream = null;
-            (state as unknown as OpenClawApp).chatStreamStartedAt = null;
-            state.chatRunId = null;
-            (state as unknown as OpenClawApp).resetToolStream();
-            (state as unknown as OpenClawApp).resetChatScroll();
-            state.applySettings({
-              ...state.settings,
-              sessionKey: next,
-              lastActiveSessionKey: next,
-            });
-            void state.loadAssistantIdentity();
-            syncUrlWithSessionKey(
-              state as unknown as Parameters<typeof syncUrlWithSessionKey>[0],
-              next,
-              true,
-            );
-            void loadChatHistory(state as unknown as ChatState);
+            switchSession(state, (e.target as HTMLSelectElement).value);
           }}
         >
           ${repeat(
@@ -291,7 +287,7 @@ export function renderChatControls(state: AppViewState) {
   `;
 }
 
-function resolveMainSessionKey(
+export function resolveMainSessionKey(
   hello: AppViewState["hello"],
   sessions: SessionsListResult | null,
 ): string | null {
@@ -311,7 +307,7 @@ function resolveMainSessionKey(
 }
 
 /* ── Channel display labels ────────────────────────────── */
-const CHANNEL_LABELS: Record<string, string> = {
+export const CHANNEL_LABELS: Record<string, string> = {
   bluebubbles: "iMessage",
   telegram: "Telegram",
   discord: "Discord",

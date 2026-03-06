@@ -334,4 +334,14 @@ export const en: TranslationMap = {
       nameRequiredShort: "Name required.",
     },
   },
+  sessionSwitcher: {
+    title: "Sessions",
+    toggle: "Toggle session panel",
+    search: "Search sessions\u2026",
+    groupMain: "Main",
+    groupChannels: "Channels",
+    groupCron: "Cron Jobs",
+    groupSubagent: "Subagents",
+    groupOther: "Other",
+  },
 };

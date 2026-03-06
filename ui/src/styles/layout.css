@@ -196,6 +196,8 @@
 
 .nav {
   grid-area: nav;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 12px;

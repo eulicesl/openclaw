@@ -3,7 +3,12 @@ import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { t } from "../i18n/index.ts";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderUsageTab } from "./app-render-usage-tab.ts";
-import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
+import {
+  renderChatControls,
+  renderTab,
+  renderThemeToggle,
+  switchSession,
+} from "./app-render.helpers.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
@@ -79,6 +84,7 @@ import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderSessionSwitcher } from "./views/session-switcher.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 
@@ -304,6 +310,31 @@ export function renderApp(state: AppViewState) {
             </a>
           </div>
         </div>
+        ${
+          isChat
+            ? renderSessionSwitcher({
+                state,
+                expandedGroups: state.sessionSwitcherGroups,
+                searchQuery: state.sessionSwitcherSearch,
+                onSelectSession: (key: string) => switchSession(state, key),
+                onSearchChange: (query: string) => {
+                  state.sessionSwitcherSearch = query;
+                },
+                onToggleGroup: (groupId: string) => {
+                  state.sessionSwitcherGroups = {
+                    ...state.sessionSwitcherGroups,
+                    [groupId]: !(state.sessionSwitcherGroups[groupId] ?? true),
+                  };
+                },
+                onTogglePanel: () => {
+                  state.applySettings({
+                    ...state.settings,
+                    sessionSwitcherOpen: !state.settings.sessionSwitcherOpen,
+                  });
+                },
+              })
+            : nothing
+        }
       </aside>
       <main class="content ${isChat ? "content--chat" : ""}">
         ${
