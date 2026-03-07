@@ -11,19 +11,21 @@ import AppIntents
 /// "Hey Siri, open Talk Mode in OpenClaw"
 @available(iOS 16, *)
 struct OpenTalkModeIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open Talk Mode"
-    static var description = IntentDescription(
+    static let title: LocalizedStringResource = "Open Talk Mode"
+    static let description = IntentDescription(
         "Opens OpenClaw and activates Talk Mode for voice interaction.",
         categoryName: "Communication"
     )
 
     /// Bring OpenClaw to the foreground when this intent runs.
-    static var openAppWhenRun: Bool = true
+    static let openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
         // Signal the app to navigate to Talk Mode on next foreground.
         // RootTabs observes this key and switches to the Voice tab.
-        UserDefaults.standard.set(true, forKey: "openclawPendingTalkMode")
+        await MainActor.run {
+            UserDefaults.standard.set(true, forKey: "openclawPendingTalkMode")
+        }
         return .result()
     }
 }
