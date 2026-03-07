@@ -1,29 +1,26 @@
 import SwiftUI
 
-private struct StatusGlassCardModifier: ViewModifier {
-    @Environment(\.colorSchemeContrast) private var contrast
+// MARK: - Background modifier (OS-adaptive)
 
+/// Applies Liquid Glass on iOS 26+ or a manual material/stroke/shadow on iOS 18–25.
+/// Kept separate so the padding in `StatusGlassCardModifier` is written exactly once.
+private struct StatusGlassBackgroundModifier: ViewModifier {
+    @Environment(\.colorSchemeContrast) private var contrast
     let brighten: Bool
-    let verticalPadding: CGFloat
-    let horizontalPadding: CGFloat
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            // iOS 26+: use the native Liquid Glass effect.
-            // The framework handles translucency, vibrancy, and color adaptation automatically.
-            // The `brighten` hint is not needed — glassEffect adapts to context.
+            // iOS 26+: native Liquid Glass — the framework handles translucency,
+            // vibrancy, and color adaptation automatically.
+            // The `brighten` hint is not needed on iOS 26.
             content
-                .padding(.vertical, self.verticalPadding)
-                .padding(.horizontal, self.horizontalPadding)
                 .glassEffect(
                     .regular,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
         } else {
-            // iOS 18–25: manual material + stroke + shadow fallback.
+            // iOS 18–25: manual material + stroke border + shadow.
             content
-                .padding(.vertical, self.verticalPadding)
-                .padding(.horizontal, self.horizontalPadding)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(.ultraThinMaterial)
@@ -39,6 +36,23 @@ private struct StatusGlassCardModifier: ViewModifier {
         }
     }
 }
+
+// MARK: - Card modifier
+
+private struct StatusGlassCardModifier: ViewModifier {
+    let brighten: Bool
+    let verticalPadding: CGFloat
+    let horizontalPadding: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, self.verticalPadding)
+            .padding(.horizontal, self.horizontalPadding)
+            .modifier(StatusGlassBackgroundModifier(brighten: self.brighten))
+    }
+}
+
+// MARK: - View extension
 
 extension View {
     func statusGlassCard(brighten: Bool, verticalPadding: CGFloat, horizontalPadding: CGFloat = 12) -> some View {

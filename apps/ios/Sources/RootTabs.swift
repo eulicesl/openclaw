@@ -1,11 +1,21 @@
 import SwiftUI
-import UIKit
 
 struct RootTabs: View {
+    // MARK: - Tab index enum
+
+    private enum Tab: Int {
+        case screen = 0
+        case voice = 1
+        case settings = 2
+    }
+
     @Environment(NodeAppModel.self) private var appModel
     @Environment(VoiceWakeManager.self) private var voiceWake
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(VoiceWakePreferences.enabledKey) private var voiceWakeEnabled: Bool = false
+    /// Observed via `@AppStorage` so the tab switch fires immediately,
+    /// even when the app is already in the foreground (e.g. triggered by Siri).
+    @AppStorage(OpenTalkModeIntent.pendingTalkModeKey) private var pendingTalkMode: Bool = false
     @State private var selectedTab: Int = 0
     @State private var voiceWakeToastText: String?
     @State private var toastDismissTask: Task<Void, Never>?
@@ -34,7 +44,7 @@ struct RootTabs: View {
                     if self.gatewayStatus == .connected {
                         self.showGatewayActions = true
                     } else {
-                        self.selectedTab = 2
+                        self.selectedTab = Tab.settings.rawValue
                     }
                 })
                 .padding(.leading, 10)
@@ -74,21 +84,15 @@ struct RootTabs: View {
         .gatewayActionsDialog(
             isPresented: self.$showGatewayActions,
             onDisconnect: { self.appModel.disconnectGateway() },
-            onOpenSettings: { self.selectedTab = 2 })
-        .onAppear {
-            self.handlePendingTalkModeIntent()
+            onOpenSettings: { self.selectedTab = Tab.settings.rawValue })
+        .onChange(of: self.pendingTalkMode) { _, isPending in
+            guard isPending else { return }
+            // Clear the flag and navigate to the Voice tab.
+            // Using @AppStorage means this fires immediately whether the app is
+            // in the foreground or returning from background.
+            self.pendingTalkMode = false
+            self.selectedTab = Tab.voice.rawValue
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            self.handlePendingTalkModeIntent()
-        }
-    }
-
-    /// Checks whether `OpenTalkModeIntent` fired while the app was backgrounded
-    /// and navigates to the Voice tab if so.
-    private func handlePendingTalkModeIntent() {
-        guard UserDefaults.standard.bool(forKey: "openclawPendingTalkMode") else { return }
-        UserDefaults.standard.removeObject(forKey: "openclawPendingTalkMode")
-        self.selectedTab = 1  // Voice tab
     }
 
     private var gatewayStatus: StatusPill.GatewayState {
