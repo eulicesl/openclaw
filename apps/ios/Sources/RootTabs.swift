@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootTabs: View {
     @Environment(NodeAppModel.self) private var appModel
@@ -74,6 +75,20 @@ struct RootTabs: View {
             isPresented: self.$showGatewayActions,
             onDisconnect: { self.appModel.disconnectGateway() },
             onOpenSettings: { self.selectedTab = 2 })
+        .onAppear {
+            self.handlePendingTalkModeIntent()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            self.handlePendingTalkModeIntent()
+        }
+    }
+
+    /// Checks whether `OpenTalkModeIntent` fired while the app was backgrounded
+    /// and navigates to the Voice tab if so.
+    private func handlePendingTalkModeIntent() {
+        guard UserDefaults.standard.bool(forKey: "openclawPendingTalkMode") else { return }
+        UserDefaults.standard.removeObject(forKey: "openclawPendingTalkMode")
+        self.selectedTab = 1  // Voice tab
     }
 
     private var gatewayStatus: StatusPill.GatewayState {
