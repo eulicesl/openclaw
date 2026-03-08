@@ -90,7 +90,7 @@ struct StatusPill: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Connection Status")
         .accessibilityValue(self.accessibilityValue)
-        .accessibilityHint("Double tap for connection options")
+        .accessibilityHint(self.gateway == .connected ? "Double tap for connection options" : "Double tap to open settings")
         .onDisappear { self.pulse = false }
         .task(id: self.shouldPulse) {
             if self.shouldPulse {
