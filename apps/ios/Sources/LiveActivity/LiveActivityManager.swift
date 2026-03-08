@@ -11,6 +11,11 @@ final class LiveActivityManager {
     private var currentActivity: Activity<OpenClawActivityAttributes>?
     private var activityStartDate: Date = .now
 
+    /// Tracks the last known non-working connection state so `handleWorking(nil)`
+    /// restores the correct state rather than blindly resetting to idle.
+    private enum ConnectionState { case idle, connecting, disconnected }
+    private var lastConnectionState: ConnectionState = .idle
+
     private init() {
         self.hydrateCurrentAndPruneDuplicates()
     }
@@ -47,6 +52,7 @@ final class LiveActivityManager {
                 content: ActivityContent(state: self.connectingState(), staleDate: nil),
                 pushType: nil)
             self.currentActivity = activity
+            self.lastConnectionState = .connecting
             self.logger.info("started live activity id=\(activity.id, privacy: .public)")
         } catch {
             self.logger.error("failed to start live activity: \(error.localizedDescription, privacy: .public)")
@@ -54,27 +60,40 @@ final class LiveActivityManager {
     }
 
     func handleConnecting() {
+        self.lastConnectionState = .connecting
         self.updateCurrent(state: self.connectingState())
     }
 
     func handleReconnect() {
+        self.lastConnectionState = .idle
         self.updateCurrent(state: self.idleState())
     }
 
     func handleDisconnect() {
+        self.lastConnectionState = .disconnected
         self.updateCurrent(state: self.disconnectedState())
     }
 
     /// Call when the agent begins processing a task.
     /// - Parameter task: Short human-readable description (e.g. "Building iOS app…").
-    ///   Pass `nil` to revert to idle (task completed).
+    ///   Pass `nil` to complete the task and restore the previous connection state.
     func handleWorking(task: String?) {
         if let task {
             self.updateCurrent(state: self.workingState(task: task))
             self.logger.info("live activity → working task=\(task, privacy: .public)")
         } else {
-            self.updateCurrent(state: self.idleState())
-            self.logger.info("live activity → idle (task completed)")
+            // Restore the last known connection state rather than blindly going to idle.
+            // This prevents overwriting a disconnected/connecting state if the connection
+            // changed while the task was running.
+            switch self.lastConnectionState {
+            case .idle:
+                self.updateCurrent(state: self.idleState())
+            case .connecting:
+                self.updateCurrent(state: self.connectingState())
+            case .disconnected:
+                self.updateCurrent(state: self.disconnectedState())
+            }
+            self.logger.info("live activity → \(String(describing: self.lastConnectionState)) (task completed)")
         }
     }
 
@@ -152,6 +171,8 @@ final class LiveActivityManager {
             isConnecting: false,
             isWorking: true,
             taskDescription: task,
-            startedAt: self.activityStartDate)
+            // Use `.now` so the elapsed-time timer in the Dynamic Island measures
+            // task duration, not time since the Live Activity was created.
+            startedAt: .now)
     }
 }
