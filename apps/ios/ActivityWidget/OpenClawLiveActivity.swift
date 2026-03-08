@@ -183,10 +183,6 @@ private struct TrailingView: View {
             } else if state.isIdle {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .foregroundStyle(.green)
-            } else {
-                Text(state.startedAt, style: .timer)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
             }
         }
     }

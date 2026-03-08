@@ -85,14 +85,13 @@ final class LiveActivityManager {
             // Restore the last known connection state rather than blindly going to idle.
             // This prevents overwriting a disconnected/connecting state if the connection
             // changed while the task was running.
+            let restored: OpenClawActivityAttributes.ContentState
             switch self.lastConnectionState {
-            case .idle:
-                self.updateCurrent(state: self.idleState())
-            case .connecting:
-                self.updateCurrent(state: self.connectingState())
-            case .disconnected:
-                self.updateCurrent(state: self.disconnectedState())
+            case .idle:        restored = self.idleState()
+            case .connecting:  restored = self.connectingState()
+            case .disconnected: restored = self.disconnectedState()
             }
+            self.updateCurrent(state: restored)
             self.logger.info("live activity → \(String(describing: self.lastConnectionState)) (task completed)")
         }
     }
