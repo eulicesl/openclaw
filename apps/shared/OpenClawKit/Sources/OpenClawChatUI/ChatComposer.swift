@@ -99,6 +99,7 @@ struct OpenClawChatComposer: View {
             Text("Low").tag("low")
             Text("Medium").tag("medium")
             Text("High").tag("high")
+            Text("Adaptive").tag("adaptive")
             if !Self.menuThinkingLevels.contains(self.viewModel.thinkingLevel) {
                 Text(self.viewModel.thinkingLevel.capitalized).tag(self.viewModel.thinkingLevel)
             }
