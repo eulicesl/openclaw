@@ -1031,7 +1031,11 @@ final class NodeAppModel {
         }
         // Status pill mirrors screen recording state so it stays visible without overlay stacking.
         self.screenRecordActive = true
-        defer { self.screenRecordActive = false }
+        LiveActivityManager.shared.handleWorking(task: "Recording screen…")
+        defer {
+            self.screenRecordActive = false
+            LiveActivityManager.shared.handleWorking(task: nil)
+        }
         let path = try await self.screenRecorder.record(
             screenIndex: params.screenIndex,
             durationMs: params.durationMs,
@@ -1595,6 +1599,9 @@ private extension NodeAppModel {
             self.cameraHUDKind = kind
         }
 
+        // Mirror transient camera/recording activity to the Dynamic Island.
+        LiveActivityManager.shared.handleWorking(task: text)
+
         guard let autoHideSeconds else { return }
         self.cameraHUDDismissTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(autoHideSeconds * 1_000_000_000))
@@ -1602,6 +1609,8 @@ private extension NodeAppModel {
                 self.cameraHUDText = nil
                 self.cameraHUDKind = nil
             }
+            // Task complete — return Dynamic Island to idle.
+            LiveActivityManager.shared.handleWorking(task: nil)
         }
     }
 }

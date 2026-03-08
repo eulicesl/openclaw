@@ -65,6 +65,21 @@ final class LiveActivityManager {
         self.updateCurrent(state: self.disconnectedState())
     }
 
+    /// Call when the agent begins processing a task.
+    /// - Parameter task: Short human-readable description (e.g. "Building iOS app…").
+    ///   Pass `nil` to revert to idle (task completed).
+    func handleWorking(task: String?) {
+        if let task {
+            self.updateCurrent(state: self.workingState(task: task))
+            self.logger.info("live activity → working task=\(task, privacy: .public)")
+        } else {
+            self.updateCurrent(state: self.idleState())
+            self.logger.info("live activity → idle (task completed)")
+        }
+    }
+
+    // MARK: - Private helpers
+
     private func hydrateCurrentAndPruneDuplicates() {
         let active = Activity<OpenClawActivityAttributes>.activities
         guard !active.isEmpty else {
@@ -102,15 +117,19 @@ final class LiveActivityManager {
             isIdle: false,
             isDisconnected: false,
             isConnecting: true,
+            isWorking: false,
+            taskDescription: nil,
             startedAt: self.activityStartDate)
     }
 
     private func idleState() -> OpenClawActivityAttributes.ContentState {
         OpenClawActivityAttributes.ContentState(
-            statusText: "Idle",
+            statusText: "Connected",
             isIdle: true,
             isDisconnected: false,
             isConnecting: false,
+            isWorking: false,
+            taskDescription: nil,
             startedAt: self.activityStartDate)
     }
 
@@ -120,6 +139,19 @@ final class LiveActivityManager {
             isIdle: false,
             isDisconnected: true,
             isConnecting: false,
+            isWorking: false,
+            taskDescription: nil,
+            startedAt: self.activityStartDate)
+    }
+
+    private func workingState(task: String) -> OpenClawActivityAttributes.ContentState {
+        OpenClawActivityAttributes.ContentState(
+            statusText: task,
+            isIdle: false,
+            isDisconnected: false,
+            isConnecting: false,
+            isWorking: true,
+            taskDescription: task,
             startedAt: self.activityStartDate)
     }
 }
