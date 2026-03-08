@@ -111,6 +111,12 @@ final class LiveActivityManager {
 
         self.currentActivity = keeper
         self.activityStartDate = keeper.content.state.startedAt
+        // Restore lastConnectionState from the hydrated state so handleWorking(nil)
+        // reverts to the correct state after an app restart.
+        let s = keeper.content.state
+        if s.isDisconnected       { self.lastConnectionState = .disconnected }
+        else if s.isConnecting    { self.lastConnectionState = .connecting }
+        else                      { self.lastConnectionState = .idle }
 
         let stale = active.filter { $0.id != keeper.id }
         for activity in stale {
