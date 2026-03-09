@@ -96,6 +96,9 @@ struct OpenClawChatComposer: View {
             ForEach(self.viewModel.thinkingLevelOptions) { option in
                 Text(option.label).tag(option.id)
             }
+            if !self.viewModel.thinkingLevelOptions.contains(where: { $0.id == "adaptive" }) {
+                Text("adaptive").tag("adaptive")
+            }
         }
         .labelsHidden()
         .pickerStyle(.menu)
