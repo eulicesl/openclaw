@@ -223,7 +223,6 @@ public struct OpenClawChatView: View {
         {
             ChatStreamingAssistantBubble(
                 text: text,
-                markdownVariant: self.markdownVariant,
                 showsAssistantTrace: self.showsAssistantTrace)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
