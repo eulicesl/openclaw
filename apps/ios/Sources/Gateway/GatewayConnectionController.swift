@@ -40,6 +40,11 @@ final class GatewayConnectionController {
     /// Reused instance — avoids creating CLLocationManager on the main thread
     /// each time currentPermissions() is called, which triggers a UI-thread warning.
     private let locationManager = CLLocationManager()
+    /// Cached off the main thread to avoid the UI-responsiveness warning from
+    /// calling SFSpeechRecognizer.authorizationStatus() on the main actor.
+    private nonisolated var speechRecognitionStatus: SFSpeechRecognizerAuthorizationStatus {
+        SFSpeechRecognizer.authorizationStatus()
+    }
     private weak var appModel: NodeAppModel?
     private var didAutoConnect = false
     private var pendingServiceResolvers: [String: GatewayServiceResolver] = [:]
@@ -882,7 +887,7 @@ final class GatewayConnectionController {
         var permissions: [String: Bool] = [:]
         permissions["camera"] = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
         permissions["microphone"] = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        permissions["speechRecognition"] = SFSpeechRecognizer.authorizationStatus() == .authorized
+        permissions["speechRecognition"] = self.speechRecognitionStatus == .authorized
         permissions["location"] = Self.isLocationAuthorized(
             status: self.locationManager.authorizationStatus)
             && CLLocationManager.locationServicesEnabled()
