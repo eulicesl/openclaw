@@ -129,6 +129,21 @@ public struct OpenClawChatView: View {
             }
 
             self.messageListOverlay
+
+            #if !os(macOS)
+            if self.hasPerformedInitialScroll, !self.isPinnedToBottom {
+                ScrollToBottomButton {
+                    self.isPinnedToBottom = true
+                    withAnimation(.snappy(duration: 0.22)) {
+                        self.scrollPosition = self.scrollerBottomID
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 8)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .animation(.snappy(duration: 0.2), value: self.isPinnedToBottom)
+            }
+            #endif
         }
         // Ensure the message list claims vertical space on the first layout pass.
         .frame(maxHeight: .infinity, alignment: .top)
@@ -603,3 +618,25 @@ private struct ChatNoticeBanner: View {
                         .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
     }
 }
+
+#if !os(macOS)
+/// Floating button that appears when the user scrolls away from the bottom of the chat,
+/// allowing a single tap to jump back to the latest messages.
+private struct ScrollToBottomButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: self.action) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Scroll to bottom")
+    }
+}
+#endif
