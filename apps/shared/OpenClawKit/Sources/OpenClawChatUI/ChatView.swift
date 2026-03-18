@@ -218,7 +218,8 @@ public struct OpenClawChatView: View {
                 style: self.style,
                 markdownVariant: self.markdownVariant,
                 userAccent: self.userAccent,
-                showsAssistantTrace: self.showsAssistantTrace)
+                showsAssistantTrace: self.showsAssistantTrace,
+                onRegenerate: msg.role.lowercased() != "user" ? { self.viewModel.regenerate() } : nil)
                 .frame(
                     maxWidth: .infinity,
                     alignment: msg.role.lowercased() == "user" ? .trailing : .leading)

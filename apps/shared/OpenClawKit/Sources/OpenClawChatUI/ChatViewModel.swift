@@ -94,6 +94,11 @@ public final class OpenClawChatViewModel {
         Task { await self.performAbort() }
     }
 
+    /// Re-sends the most recent user message to regenerate the assistant's response.
+    public func regenerate() {
+        Task { await self.performRegenerate() }
+    }
+
     public func refreshSessions(limit: Int? = nil) {
         Task { await self.fetchSessions(limit: limit) }
     }
@@ -403,6 +408,19 @@ public final class OpenClawChatViewModel {
         }
 
         self.isSending = false
+    }
+
+    private func performRegenerate() async {
+        guard !self.isSending else { return }
+        // Find the last user message text to resend.
+        guard let lastUserMessage = self.messages.last(where: { $0.role.lowercased() == "user" }) else { return }
+        let text = lastUserMessage.content
+            .compactMap { ($0.type ?? "text").lowercased() == "text" ? $0.text : nil }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        self.input = text
+        await self.performSend()
     }
 
     private func performAbort() async {

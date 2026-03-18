@@ -144,6 +144,7 @@ struct ChatMessageBubble: View {
     let markdownVariant: ChatMarkdownVariant
     let userAccent: Color?
     let showsAssistantTrace: Bool
+    var onRegenerate: (() -> Void)?
 
     var body: some View {
         ChatMessageBody(
@@ -156,9 +157,40 @@ struct ChatMessageBubble: View {
             .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
             .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
             .padding(.horizontal, 2)
+            #if !os(macOS)
+            .contextMenu {
+                Button {
+                    UIPasteboard.general.string = self.plainText
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+
+                ShareLink(item: self.plainText) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+
+                if !self.isUser, let onRegenerate {
+                    Divider()
+                    Button(action: onRegenerate) {
+                        Label("Regenerate", systemImage: "arrow.counterclockwise")
+                    }
+                }
+            }
+            #endif
     }
 
     private var isUser: Bool { self.message.role.lowercased() == "user" }
+
+    private var plainText: String {
+        self.message.content
+            .compactMap { content -> String? in
+                let kind = (content.type ?? "text").lowercased()
+                guard kind == "text" || kind.isEmpty else { return nil }
+                return content.text
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 @MainActor
