@@ -11,13 +11,11 @@ public struct OpenClawChatView: View {
     }
 
     @State private var viewModel: OpenClawChatViewModel
-    @State private var scrollerBottomID = UUID()
-    @State private var scrollPosition: UUID?
+    @State private var scrollerBottomID = "chatScrollBottom"
     @State private var showSessions = false
     @State private var hasPerformedInitialScroll = false
     @State private var isPinnedToBottom = true
     @State private var lastUserMessageID: UUID?
-    @State private var streamingScrollTask: Task<Void, Never>?
     private let showsSessionSwitcher: Bool
     private let style: Style
     private let markdownVariant: ChatMarkdownVariant
@@ -75,7 +73,8 @@ public struct OpenClawChatView: View {
                 OpenClawChatComposer(
                     viewModel: self.viewModel,
                     style: self.style,
-                    showsSessionSwitcher: self.showsSessionSwitcher)
+                    showsSessionSwitcher: self.showsSessionSwitcher,
+                    showSessions: self.$showSessions)
                     .padding(.horizontal, Layout.composerPaddingHorizontal)
             }
             .padding(.vertical, Layout.outerPaddingVertical)
@@ -87,6 +86,10 @@ public struct OpenClawChatView: View {
         .sheet(isPresented: self.$showSessions) {
             if self.showsSessionSwitcher {
                 ChatSessionsSheet(viewModel: self.viewModel)
+                    #if !os(macOS)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    #endif
             } else {
                 EmptyView()
             }
@@ -95,31 +98,89 @@ public struct OpenClawChatView: View {
 
     private var messageList: some View {
         ZStack {
-            ScrollView {
-                LazyVStack(spacing: Layout.messageSpacing) {
-                    self.messageListRows
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: Layout.messageSpacing) {
+                        self.messageListRows
 
-                    Color.clear
-                        #if os(macOS)
-                        .frame(height: Layout.messageListPaddingBottom)
-                        #else
-                        .frame(height: Layout.messageListPaddingBottom + 1)
-                        #endif
-                        .id(self.scrollerBottomID)
+                        Color.clear
+                            #if os(macOS)
+                            .frame(height: Layout.messageListPaddingBottom)
+                            #else
+                            .frame(height: Layout.messageListPaddingBottom + 1)
+                            #endif
+                            .id(self.scrollerBottomID)
+                    }
+                    .padding(.top, Layout.messageListPaddingTop)
+                    .padding(.horizontal, Layout.messageListPaddingHorizontal)
                 }
-                // Use scroll targets for stable auto-scroll without ScrollViewReader relayout glitches.
-                .scrollTargetLayout()
-                .padding(.top, Layout.messageListPaddingTop)
-                .padding(.horizontal, Layout.messageListPaddingHorizontal)
-            }
-            #if !os(macOS)
-            .scrollDismissesKeyboard(.interactively)
-            #endif
-            // Keep the scroll pinned to the bottom for new messages.
-            .scrollPosition(id: self.$scrollPosition, anchor: .bottom)
-            .onChange(of: self.scrollPosition) { _, position in
-                guard let position else { return }
-                self.isPinnedToBottom = position == self.scrollerBottomID
+                // defaultScrollAnchor keeps the viewport at the bottom as content
+                // grows (streaming tokens, new messages) without any explicit scroll
+                // mutations that can fight layout.
+                .defaultScrollAnchor(.bottom)
+                #if !os(macOS)
+                .scrollDismissesKeyboard(.interactively)
+                #endif
+                .onChange(of: self.viewModel.isLoading) { _, isLoading in
+                    guard !isLoading, !self.hasPerformedInitialScroll else { return }
+                    proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                    self.hasPerformedInitialScroll = true
+                    self.isPinnedToBottom = true
+                }
+                .onChange(of: self.viewModel.sessionKey) { _, _ in
+                    self.hasPerformedInitialScroll = false
+                    self.isPinnedToBottom = true
+                }
+                .onChange(of: self.viewModel.isSending) { _, isSending in
+                    guard isSending, self.hasPerformedInitialScroll else { return }
+                    self.isPinnedToBottom = true
+                    withAnimation(.snappy(duration: 0.22)) {
+                        proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                    }
+                }
+                .onChange(of: self.viewModel.messages.count) { _, _ in
+                    guard self.hasPerformedInitialScroll else { return }
+                    if let lastMessage = self.viewModel.messages.last,
+                       lastMessage.role.lowercased() == "user",
+                       lastMessage.id != self.lastUserMessageID {
+                        self.lastUserMessageID = lastMessage.id
+                        self.isPinnedToBottom = true
+                        withAnimation(.snappy(duration: 0.22)) {
+                            proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                        }
+                        return
+                    }
+                    guard self.isPinnedToBottom else { return }
+                    withAnimation(.snappy(duration: 0.22)) {
+                        proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                    }
+                }
+                .onChange(of: self.viewModel.pendingRunCount) { _, _ in
+                    guard self.hasPerformedInitialScroll, self.isPinnedToBottom else { return }
+                    withAnimation(.snappy(duration: 0.22)) {
+                        proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                    }
+                }
+                // Streaming token scroll is handled by `.defaultScrollAnchor(.bottom)`.
+                // Mutating scrollPosition per-token causes geometry cycling (which
+                // eventually stack-overflows with large histories), and calling
+                // scrollTo per-token causes re-entrant view evaluation. The default
+                // anchor keeps the viewport pinned passively.
+                .overlay(alignment: .bottom) {
+                    #if !os(macOS)
+                    if self.hasPerformedInitialScroll, !self.isPinnedToBottom {
+                        ScrollToBottomButton {
+                            self.isPinnedToBottom = true
+                            withAnimation(.snappy(duration: 0.22)) {
+                                proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
+                            }
+                        }
+                        .padding(.bottom, 8)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                        .animation(.snappy(duration: 0.2), value: self.isPinnedToBottom)
+                    }
+                    #endif
+                }
             }
 
             if self.viewModel.isLoading {
@@ -129,21 +190,6 @@ public struct OpenClawChatView: View {
             }
 
             self.messageListOverlay
-
-            #if !os(macOS)
-            if self.hasPerformedInitialScroll, !self.isPinnedToBottom {
-                ScrollToBottomButton {
-                    self.isPinnedToBottom = true
-                    withAnimation(.snappy(duration: 0.22)) {
-                        self.scrollPosition = self.scrollerBottomID
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 8)
-                .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                .animation(.snappy(duration: 0.2), value: self.isPinnedToBottom)
-            }
-            #endif
         }
         // Ensure the message list claims vertical space on the first layout pass.
         .frame(maxHeight: .infinity, alignment: .top)
@@ -152,62 +198,6 @@ public struct OpenClawChatView: View {
             TapGesture().onEnded {
                 self.dismissKeyboardIfNeeded()
             })
-        .onChange(of: self.viewModel.isLoading) { _, isLoading in
-            guard !isLoading, !self.hasPerformedInitialScroll else { return }
-            self.scrollPosition = self.scrollerBottomID
-            self.hasPerformedInitialScroll = true
-            self.isPinnedToBottom = true
-        }
-        .onChange(of: self.viewModel.sessionKey) { _, _ in
-            self.hasPerformedInitialScroll = false
-            self.isPinnedToBottom = true
-        }
-        .onChange(of: self.viewModel.isSending) { _, isSending in
-            // Scroll to bottom when user sends a message, even if scrolled up.
-            guard isSending, self.hasPerformedInitialScroll else { return }
-            self.isPinnedToBottom = true
-            withAnimation(.snappy(duration: 0.22)) {
-                self.scrollPosition = self.scrollerBottomID
-            }
-        }
-        .onChange(of: self.viewModel.messages.count) { _, _ in
-            guard self.hasPerformedInitialScroll else { return }
-            if let lastMessage = self.viewModel.messages.last,
-               lastMessage.role.lowercased() == "user",
-               lastMessage.id != self.lastUserMessageID {
-                self.lastUserMessageID = lastMessage.id
-                self.isPinnedToBottom = true
-                withAnimation(.snappy(duration: 0.22)) {
-                    self.scrollPosition = self.scrollerBottomID
-                }
-                return
-            }
-
-            guard self.isPinnedToBottom else { return }
-            withAnimation(.snappy(duration: 0.22)) {
-                self.scrollPosition = self.scrollerBottomID
-            }
-        }
-        .onChange(of: self.viewModel.pendingRunCount) { _, _ in
-            guard self.hasPerformedInitialScroll, self.isPinnedToBottom else { return }
-            withAnimation(.snappy(duration: 0.22)) {
-                self.scrollPosition = self.scrollerBottomID
-            }
-        }
-        .onChange(of: self.viewModel.streamingAssistantText) { _, _ in
-            guard self.hasPerformedInitialScroll, self.isPinnedToBottom else { return }
-            // Coalesce rapid streaming tokens into a single scroll update per
-            // ~100 ms window to avoid layout cycling ("Geometry action is cycling
-            // between duplicate values") when tokens arrive faster than frames.
-            guard self.streamingScrollTask == nil else { return }
-            self.streamingScrollTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                withAnimation(.snappy(duration: 0.22)) {
-                    self.scrollPosition = self.scrollerBottomID
-                }
-                self.streamingScrollTask = nil
-            }
-        }
     }
 
     @ViewBuilder
@@ -251,6 +241,10 @@ public struct OpenClawChatView: View {
         }
     }
 
+    /// Cap the number of rendered messages to avoid deep view hierarchies that
+    /// exhaust the main-thread stack (StructuredText + LazyVStack depth).
+    private static let maxRenderedMessages = 50
+
     private var visibleMessages: [OpenClawChatMessage] {
         let base: [OpenClawChatMessage]
         if self.style == .onboarding {
@@ -260,7 +254,11 @@ public struct OpenClawChatView: View {
         } else {
             base = self.viewModel.messages
         }
-        return self.mergeToolResults(in: base).filter(self.shouldDisplayMessage(_:))
+        let filtered = self.mergeToolResults(in: base).filter(self.shouldDisplayMessage(_:))
+        if filtered.count > Self.maxRenderedMessages {
+            return Array(filtered.suffix(Self.maxRenderedMessages))
+        }
+        return filtered
     }
 
     @ViewBuilder
@@ -572,13 +570,36 @@ private struct ChatNoticeCard: View {
             }
         }
         .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(OpenClawChatTheme.subtleCard)
-                .overlay(
+        .modifier(NoticeCardBackground())
+    }
+}
+
+private struct NoticeCardBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 18))
+        } else {
+            content
+                .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
-        .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+                        .fill(OpenClawChatTheme.subtleCard)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
+                .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+        }
+        #else
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(OpenClawChatTheme.subtleCard)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
+            .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+        #endif
     }
 }
 
@@ -625,12 +646,34 @@ private struct ChatNoticeBanner: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(OpenClawChatTheme.subtleCard)
-                .overlay(
+        .modifier(NoticeBannerBackground())
+    }
+}
+
+private struct NoticeBannerBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        } else {
+            content
+                .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
+                        .fill(OpenClawChatTheme.subtleCard)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
+        }
+        #else
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(OpenClawChatTheme.subtleCard)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
+        #endif
     }
 }
 
@@ -646,12 +689,24 @@ private struct ScrollToBottomButton: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 36, height: 36)
+                .modifier(ScrollToBottomBackground())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Scroll to bottom")
+    }
+}
+
+private struct ScrollToBottomBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            content
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Scroll to bottom")
     }
 }
 
@@ -676,16 +731,28 @@ private struct StarterPrompts: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(OpenClawChatTheme.subtleCard)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
+                        .modifier(StarterPromptBackground())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.primary)
             }
+        }
+    }
+}
+
+private struct StarterPromptBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
+        } else {
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(OpenClawChatTheme.subtleCard)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
         }
     }
 }

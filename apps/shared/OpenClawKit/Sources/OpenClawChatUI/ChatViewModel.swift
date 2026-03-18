@@ -107,6 +107,10 @@ public final class OpenClawChatViewModel {
         Task { await self.performSwitchSession(to: sessionKey) }
     }
 
+    public func clearSession(_ sessionKey: String) {
+        Task { await self.performClearSession(sessionKey) }
+    }
+
     public var sessionChoices: [OpenClawChatSessionEntry] {
         let now = Date().timeIntervalSince1970 * 1000
         let cutoff = now - (24 * 60 * 60 * 1000)
@@ -454,6 +458,21 @@ public final class OpenClawChatViewModel {
         guard next != self.sessionKey else { return }
         self.sessionKey = next
         await self.bootstrap()
+    }
+
+    private func performClearSession(_ key: String) async {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            try await self.transport.clearSession(sessionKey: trimmed)
+        } catch {
+            self.errorText = error.localizedDescription
+            return
+        }
+        // If the cleared session is the active one, reload it (now empty).
+        if trimmed == self.sessionKey {
+            await self.bootstrap()
+        }
     }
 
     private func placeholderSession(key: String) -> OpenClawChatSessionEntry {

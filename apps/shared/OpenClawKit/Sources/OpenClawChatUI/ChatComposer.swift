@@ -13,6 +13,7 @@ struct OpenClawChatComposer: View {
     @Bindable var viewModel: OpenClawChatViewModel
     let style: OpenClawChatView.Style
     let showsSessionSwitcher: Bool
+    @Binding var showSessions: Bool
 
     #if !os(macOS)
     @State private var pickerItems: [PhotosPickerItem] = []
@@ -97,7 +98,9 @@ struct OpenClawChatComposer: View {
         .frame(maxWidth: 140, alignment: .leading)
     }
 
+    @ViewBuilder
     private var sessionPicker: some View {
+        #if os(macOS)
         Picker(
             "Session",
             selection: Binding(
@@ -115,6 +118,21 @@ struct OpenClawChatComposer: View {
         .controlSize(.small)
         .frame(maxWidth: 160, alignment: .leading)
         .help("Session")
+        #else
+        Button {
+            self.showSessions = true
+        } label: {
+            HStack(spacing: 4) {
+                Text(self.activeSessionLabel)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+        }
+        .modifier(SessionPickerButtonStyle())
+        .controlSize(.small)
+        #endif
     }
 
     @ViewBuilder
@@ -427,6 +445,20 @@ struct OpenClawChatComposer: View {
     }
     #endif
 }
+
+#if !os(macOS)
+private struct SessionPickerButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+        } else {
+            content
+                .buttonStyle(.bordered)
+        }
+    }
+}
+#endif
 
 #if os(macOS)
 import AppKit
