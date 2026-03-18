@@ -43,8 +43,27 @@ public struct WebSocketTaskBox: @unchecked Sendable {
     }
 
     public func sendPing() async throws {
+        final class PingContinuationBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private var continuation: CheckedContinuation<Void, Error>?
+
+            init(_ continuation: CheckedContinuation<Void, Error>) {
+                self.continuation = continuation
+            }
+
+            func take() -> CheckedContinuation<Void, Error>? {
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                let current = self.continuation
+                self.continuation = nil
+                return current
+            }
+        }
+
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let box = PingContinuationBox(continuation)
             self.task.sendPing { error in
+                guard let continuation = box.take() else { return }
                 ThrowingContinuationSupport.resumeVoid(continuation, error: error)
             }
         }
