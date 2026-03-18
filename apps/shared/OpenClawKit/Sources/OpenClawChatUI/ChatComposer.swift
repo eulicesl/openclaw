@@ -4,6 +4,7 @@ import SwiftUI
 
 #if !os(macOS)
 import PhotosUI
+import UIKit
 import UniformTypeIdentifiers
 #endif
 
@@ -271,38 +272,62 @@ struct OpenClawChatComposer: View {
         Group {
             if self.viewModel.pendingRunCount > 0 {
                 Button {
+                    self.fireSendHaptic()
                     self.viewModel.abort()
                 } label: {
                     if self.viewModel.isAborting {
                         ProgressView().controlSize(.mini)
                     } else {
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: Self.sendIconSize, weight: .semibold))
                     }
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .padding(6)
+                .frame(width: Self.sendButtonSize, height: Self.sendButtonSize)
                 .background(Circle().fill(Color.red))
                 .disabled(self.viewModel.isAborting)
             } else {
                 Button {
+                    self.fireSendHaptic()
                     self.viewModel.send()
                 } label: {
                     if self.viewModel.isSending {
                         ProgressView().controlSize(.mini)
                     } else {
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: Self.sendIconSize, weight: .semibold))
                     }
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .padding(6)
+                .frame(width: Self.sendButtonSize, height: Self.sendButtonSize)
                 .background(Circle().fill(Color.accentColor))
                 .disabled(!self.viewModel.canSend)
             }
         }
+    }
+
+    private static let sendButtonSize: CGFloat = {
+        #if os(macOS)
+        return 26
+        #else
+        return 34
+        #endif
+    }()
+
+    private static let sendIconSize: CGFloat = {
+        #if os(macOS)
+        return 13
+        #else
+        return 15
+        #endif
+    }()
+
+    private func fireSendHaptic() {
+        #if !os(macOS)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
     }
 
     private var refreshButton: some View {
@@ -341,7 +366,11 @@ struct OpenClawChatComposer: View {
     }
 
     private var textMaxHeight: CGFloat {
+        #if os(macOS)
         self.style == .onboarding ? 52 : 64
+        #else
+        self.style == .onboarding ? 52 : 140
+        #endif
     }
 
     private var isComposerCompacted: Bool {
