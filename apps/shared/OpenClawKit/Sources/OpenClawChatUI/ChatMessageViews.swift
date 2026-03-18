@@ -254,6 +254,12 @@ private struct ChatMessageBody: View {
                         toolName: toolResult.name)
                 }
             }
+
+            if !self.isUser {
+                MessageFooter(
+                    timestamp: self.message.timestamp,
+                    usage: self.message.usage)
+            }
         }
         .textSelection(.enabled)
         .padding(.vertical, 10)
@@ -499,6 +505,51 @@ private struct ToolResultCard: View {
 
     private var shouldShowToggle: Bool {
         self.lines.count > Self.previewLineLimit
+    }
+}
+
+/// Compact footer showing timestamp and optional token usage beneath assistant messages.
+private struct MessageFooter: View {
+    let timestamp: Double?
+    let usage: OpenClawChatUsage?
+
+    var body: some View {
+        let hasContent = self.timestamp != nil || self.usage != nil
+        if hasContent {
+            HStack(spacing: 6) {
+                if let ts = self.timestamp {
+                    Text(Self.format(timestamp: ts))
+                }
+
+                if let usage, let total = usage.total, total > 0 {
+                    Text("·")
+                    Text(Self.formatTokens(total))
+                }
+
+                Spacer(minLength: 0)
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+        }
+    }
+
+    private static func format(timestamp ms: Double) -> String {
+        let date = Date(timeIntervalSince1970: ms / 1000)
+        let formatter = DateFormatter()
+        if Calendar.current.isDateInToday(date) {
+            formatter.dateFormat = "h:mm a"
+        } else {
+            formatter.dateFormat = "MMM d, h:mm a"
+        }
+        return formatter.string(from: date)
+    }
+
+    private static func formatTokens(_ count: Int) -> String {
+        if count >= 1000 {
+            let k = Double(count) / 1000
+            return String(format: "%.1fk tokens", k)
+        }
+        return "\(count) tokens"
     }
 }
 

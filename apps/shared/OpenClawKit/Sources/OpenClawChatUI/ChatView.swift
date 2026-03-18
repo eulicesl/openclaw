@@ -295,15 +295,29 @@ public struct OpenClawChatView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else if self.showsEmptyState {
-            ChatNoticeCard(
-                systemImage: "bubble.left.and.bubble.right.fill",
-                title: self.emptyStateTitle,
-                message: self.emptyStateMessage,
-                tint: .accentColor,
-                actionTitle: nil,
-                action: nil)
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 20) {
+                Spacer()
+                ChatNoticeCard(
+                    systemImage: "bubble.left.and.bubble.right.fill",
+                    title: self.emptyStateTitle,
+                    message: self.emptyStateMessage,
+                    tint: .accentColor,
+                    actionTitle: nil,
+                    action: nil)
+
+                #if !os(macOS)
+                if self.style == .standard {
+                    StarterPrompts { prompt in
+                        self.viewModel.input = prompt
+                        self.viewModel.send()
+                    }
+                }
+                #endif
+
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -638,6 +652,41 @@ private struct ScrollToBottomButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Scroll to bottom")
+    }
+}
+
+/// Tappable starter prompt chips shown in the empty state to help users begin a conversation.
+private struct StarterPrompts: View {
+    let onSelect: (String) -> Void
+
+    private static let prompts = [
+        "What can you help me with?",
+        "Summarize my last conversation",
+        "What's new today?",
+    ]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(Self.prompts, id: \.self) { prompt in
+                Button {
+                    self.onSelect(prompt)
+                } label: {
+                    Text(prompt)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(OpenClawChatTheme.subtleCard)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+            }
+        }
     }
 }
 #endif

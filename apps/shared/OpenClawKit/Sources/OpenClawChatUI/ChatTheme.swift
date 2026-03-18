@@ -80,7 +80,17 @@ enum OpenClawChatTheme {
             Color.black.opacity(0.08)
         }
         #else
-        Color(uiColor: .systemBackground)
+        ZStack {
+            Color(uiColor: .systemBackground)
+            // Subtle warm gradient to lift iOS from a flat background
+            LinearGradient(
+                colors: [
+                    Color(uiColor: .systemBackground),
+                    Color(uiColor: .secondarySystemBackground).opacity(0.4),
+                ],
+                startPoint: .top,
+                endPoint: .bottom)
+        }
         #endif
     }
 
