@@ -1,12 +1,14 @@
 import Foundation
 
-struct AssistantTextSegment: Identifiable {
-    enum Kind {
+struct AssistantTextSegment: Identifiable, Equatable {
+    enum Kind: Equatable {
         case thinking
         case response
     }
 
-    let id = UUID()
+    /// Stable identity derived from position + kind so SwiftUI can diff
+    /// incrementally during streaming instead of tearing down every view.
+    let id: String
     let kind: Kind
     let text: String
 }
@@ -16,7 +18,7 @@ enum AssistantTextParser {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         guard raw.contains("<") else {
-            return [AssistantTextSegment(kind: .response, text: trimmed)]
+            return [AssistantTextSegment(id: "r0", kind: .response, text: trimmed)]
         }
 
         var segments: [AssistantTextSegment] = []
@@ -51,7 +53,7 @@ enum AssistantTextParser {
         }
 
         guard matchedTag else {
-            return [AssistantTextSegment(kind: .response, text: trimmed)]
+            return [AssistantTextSegment(id: "r0", kind: .response, text: trimmed)]
         }
 
         if includeThinking {
@@ -146,6 +148,8 @@ enum AssistantTextParser {
     {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        segments.append(AssistantTextSegment(kind: kind, text: trimmed))
+        let index = segments.count
+        let prefix = kind == .thinking ? "t" : "r"
+        segments.append(AssistantTextSegment(id: "\(prefix)\(index)", kind: kind, text: trimmed))
     }
 }

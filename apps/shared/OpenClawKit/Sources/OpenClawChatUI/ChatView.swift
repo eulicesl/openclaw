@@ -17,6 +17,7 @@ public struct OpenClawChatView: View {
     @State private var hasPerformedInitialScroll = false
     @State private var isPinnedToBottom = true
     @State private var lastUserMessageID: UUID?
+    @State private var streamingScrollTask: Task<Void, Never>?
     private let showsSessionSwitcher: Bool
     private let style: Style
     private let markdownVariant: ChatMarkdownVariant
@@ -180,12 +181,16 @@ public struct OpenClawChatView: View {
         }
         .onChange(of: self.viewModel.streamingAssistantText) { _, _ in
             guard self.hasPerformedInitialScroll, self.isPinnedToBottom else { return }
-            // Defer past the current layout pass to avoid "onChange tried to update
-            // multiple times per frame" warnings during rapid streaming token delivery.
-            Task { @MainActor in
+            // Coalesce rapid streaming tokens into a single scroll update per
+            // ~100 ms window to avoid layout cycling ("Geometry action is cycling
+            // between duplicate values") when tokens arrive faster than frames.
+            guard self.streamingScrollTask == nil else { return }
+            self.streamingScrollTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 100_000_000)
                 withAnimation(.snappy(duration: 0.22)) {
                     self.scrollPosition = self.scrollerBottomID
                 }
+                self.streamingScrollTask = nil
             }
         }
     }
