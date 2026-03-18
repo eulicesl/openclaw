@@ -684,14 +684,45 @@ private struct ChatAssistantTextBody: View {
         let segments = AssistantTextParser.segments(from: self.text, includeThinking: self.includesThinking)
         VStack(alignment: .leading, spacing: 10) {
             ForEach(segments) { segment in
-                let font = segment.kind == .thinking ? Font.system(size: 14).italic() : Font.system(size: 14)
-                ChatMarkdownRenderer(
-                    text: segment.text,
-                    context: .assistant,
-                    variant: self.markdownVariant,
-                    font: font,
-                    textColor: OpenClawChatTheme.assistantText)
+                if segment.kind == .thinking {
+                    ThinkingDisclosure(
+                        text: segment.text,
+                        markdownVariant: self.markdownVariant)
+                } else {
+                    ChatMarkdownRenderer(
+                        text: segment.text,
+                        context: .assistant,
+                        variant: self.markdownVariant,
+                        font: .system(size: 14),
+                        textColor: OpenClawChatTheme.assistantText)
+                }
             }
         }
+    }
+}
+
+/// A collapsible disclosure that wraps thinking/reasoning text, collapsed by default.
+@MainActor
+private struct ThinkingDisclosure: View {
+    let text: String
+    let markdownVariant: ChatMarkdownVariant
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: self.$isExpanded) {
+            ChatMarkdownRenderer(
+                text: self.text,
+                context: .assistant,
+                variant: self.markdownVariant,
+                font: .system(size: 13).italic(),
+                textColor: OpenClawChatTheme.assistantText.opacity(0.7))
+        } label: {
+            Label(
+                self.isExpanded ? "Thinking" : "Thinking…",
+                systemImage: "brain")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .tint(.secondary)
     }
 }
