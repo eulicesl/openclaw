@@ -524,9 +524,39 @@ struct ChatStreamingAssistantBubble: View {
                 text: self.text,
                 markdownVariant: self.markdownVariant,
                 includesThinking: self.showsAssistantTrace)
+            StreamingCursor()
         }
         .padding(12)
         .assistantBubbleContainerStyle()
+    }
+}
+
+extension ChatStreamingAssistantBubble: @MainActor Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text &&
+        lhs.markdownVariant == rhs.markdownVariant &&
+        lhs.showsAssistantTrace == rhs.showsAssistantTrace
+    }
+}
+
+/// A blinking vertical bar cursor shown at the end of streaming assistant text,
+/// similar to ChatGPT and Claude iOS.
+@MainActor
+private struct StreamingCursor: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var visible = true
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(OpenClawChatTheme.assistantText.opacity(self.visible ? 0.85 : 0.0))
+            .frame(width: 2.5, height: 16)
+            .animation(
+                self.reduceMotion ? nil : .easeInOut(duration: 0.45).repeatForever(autoreverses: true),
+                value: self.visible)
+            .onAppear {
+                guard !self.reduceMotion else { return }
+                self.visible = false
+            }
     }
 }
 

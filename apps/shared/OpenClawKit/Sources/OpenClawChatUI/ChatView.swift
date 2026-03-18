@@ -230,6 +230,7 @@ public struct OpenClawChatView: View {
                 text: text,
                 markdownVariant: self.markdownVariant,
                 showsAssistantTrace: self.showsAssistantTrace)
+                .equatable()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
