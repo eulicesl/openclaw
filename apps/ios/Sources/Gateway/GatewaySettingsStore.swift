@@ -412,11 +412,13 @@ enum GatewayDiagnostics {
     private static let keepLogBytes: Int64 = 256 * 1024
     private static let logSizeCheckEveryWrites = 50
     private static let logWritesSinceCheck = OSAllocatedUnfairLock(initialState: 0)
-    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    nonisolated(unsafe) private static let isoFormatter = Self.makeISOFormatter()
+
+    private static func makeISOFormatter() -> ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }
 
     private static func isoTimestamp() -> String {
         self.isoFormatter.string(from: Date())

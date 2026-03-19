@@ -230,6 +230,7 @@ public struct OpenClawChatView: View {
         }
 
         if let text = self.viewModel.streamingAssistantText,
+           !text.isEmpty,
            AssistantTextParser.hasVisibleContent(in: text, includeThinking: self.showsAssistantTrace)
         {
             ChatStreamingAssistantBubble(

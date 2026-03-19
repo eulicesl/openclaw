@@ -198,11 +198,13 @@ private struct StatusDot: View {
     }
 
     private var dotColor: Color {
-        if state.isDisconnected { return .red }
-        if state.isConnecting { return .gray }
-        if state.isWorking { return .blue }
-        if state.isIdle { return .green }
-        return .secondary
+        switch true {
+        case state.isDisconnected: .red
+        case state.isConnecting: .gray
+        case state.isWorking: .blue
+        case state.isIdle: .green
+        default: .secondary
+        }
     }
 }
 

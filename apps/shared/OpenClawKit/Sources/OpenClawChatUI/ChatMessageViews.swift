@@ -1,6 +1,11 @@
 import OpenClawKit
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 private enum ChatUIConstants {
     static let bubbleMaxWidth: CGFloat = 560
@@ -157,10 +162,9 @@ struct ChatMessageBubble: View {
             .frame(maxWidth: ChatUIConstants.bubbleMaxWidth, alignment: self.isUser ? .trailing : .leading)
             .frame(maxWidth: .infinity, alignment: self.isUser ? .trailing : .leading)
             .padding(.horizontal, 2)
-            #if !os(macOS)
             .contextMenu {
                 Button {
-                    UIPasteboard.general.string = self.plainText
+                    self.copyPlainTextToPasteboard()
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
@@ -176,7 +180,15 @@ struct ChatMessageBubble: View {
                     }
                 }
             }
-            #endif
+    }
+
+    private func copyPlainTextToPasteboard() {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = self.plainText
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(self.plainText, forType: .string)
+        #endif
     }
 
     private var isUser: Bool { self.message.role.lowercased() == "user" }
