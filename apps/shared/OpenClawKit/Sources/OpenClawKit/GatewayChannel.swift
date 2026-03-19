@@ -63,7 +63,10 @@ public struct WebSocketTaskBox: @unchecked Sendable {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let box = PingContinuationBox(continuation)
             self.task.sendPing { error in
-                guard let continuation = box.take() else { return }
+                guard let continuation = box.take() else {
+                    Logger(subsystem: "ai.openclaw", category: "gateway").warning("Duplicate pong receive handler")
+                    return
+                }
                 ThrowingContinuationSupport.resumeVoid(continuation, error: error)
             }
         }

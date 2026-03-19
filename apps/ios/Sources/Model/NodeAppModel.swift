@@ -1039,8 +1039,8 @@ final class NodeAppModel {
         self.screenRecordActive = true
         LiveActivityManager.shared.handleWorking(task: "Recording screen…")
         defer {
-            self.screenRecordActive = false
             LiveActivityManager.shared.handleWorking(task: nil)
+            self.screenRecordActive = false
         }
         let path = try await self.screenRecorder.record(
             screenIndex: params.screenIndex,
