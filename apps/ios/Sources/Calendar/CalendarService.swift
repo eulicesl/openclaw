@@ -4,6 +4,7 @@ import OpenClawKit
 
 final class CalendarService: CalendarServicing {
     func events(params: OpenClawCalendarEventsParams) async throws -> OpenClawCalendarEventsPayload {
+        let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
         let authorized: Bool = if status == .notDetermined || status == .writeOnly {
             await Self.requestFullEventAccess()
@@ -16,7 +17,6 @@ final class CalendarService: CalendarServicing {
             ])
         }
 
-        let store = EKEventStore()
         let (start, end) = Self.resolveRange(
             startISO: params.startISO,
             endISO: params.endISO)
@@ -41,6 +41,7 @@ final class CalendarService: CalendarServicing {
     }
 
     func add(params: OpenClawCalendarAddParams) async throws -> OpenClawCalendarAddPayload {
+        let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
         let authorized: Bool = if status == .notDetermined {
             await Self.requestWriteOnlyEventAccess()
@@ -53,7 +54,6 @@ final class CalendarService: CalendarServicing {
             ])
         }
 
-        let store = EKEventStore()
         let title = params.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else {
             throw NSError(domain: "Calendar", code: 3, userInfo: [
