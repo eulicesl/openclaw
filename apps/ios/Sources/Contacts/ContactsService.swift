@@ -102,12 +102,8 @@ final class ContactsService: ContactsServicing {
         case .authorized, .limited:
             return true
         case .notDetermined:
-            return await PermissionRequestBridge.awaitRequest { completion in
-                let store = CNContactStore()
-                store.requestAccess(for: .contacts) { granted, _ in
-                    completion(granted)
-                }
-            }
+            // Avoid prompting during node.invoke; headless/unattended flows should fail fast.
+            return false
         case .restricted, .denied:
             return false
         @unknown default:

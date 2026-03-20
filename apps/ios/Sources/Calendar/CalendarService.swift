@@ -43,10 +43,11 @@ final class CalendarService: CalendarServicing {
     func add(params: OpenClawCalendarAddParams) async throws -> OpenClawCalendarAddPayload {
         let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
-        let authorized: Bool = if status == .notDetermined {
-            await Self.requestWriteOnlyEventAccess()
+        let authorized: Bool
+        if status == .notDetermined {
+            authorized = await Self.requestWriteOnlyEventAccess(store: store)
         } else {
-            EventKitAuthorization.allowsWrite(status: status)
+            authorized = EventKitAuthorization.allowsWrite(status: status)
         }
         guard authorized else {
             throw NSError(domain: "Calendar", code: 2, userInfo: [
@@ -112,11 +113,18 @@ final class CalendarService: CalendarServicing {
         }
     }
 
-    private static func requestWriteOnlyEventAccess() async -> Bool {
-        await PermissionRequestBridge.awaitRequest { completion in
-            let store = EKEventStore()
-            store.requestWriteOnlyAccessToEvents { granted, _ in
-                completion(granted)
+    private static func requestWriteOnlyEventAccess(store: EKEventStore) async -> Bool {
+        if #available(iOS 17.0, *) {
+            return await withCheckedContinuation { continuation in
+                store.requestWriteOnlyAccessToEvents { granted, _ in
+                    continuation.resume(returning: granted)
+                }
+            }
+        }
+
+        return await withCheckedContinuation { continuation in
+            store.requestAccess(to: .event) { granted, _ in
+                continuation.resume(returning: granted)
             }
         }
     }
