@@ -44,6 +44,8 @@ final class GatewayConnectionController {
     private let locationManager = CLLocationManager()
     private weak var appModel: NodeAppModel?
     private var didAutoConnect = false
+    private var autoConnectGeneration: Int = 0
+    private var refreshRegistrationGeneration: Int = 0
     private var pendingServiceResolvers: [String: GatewayServiceResolver] = [:]
     private var pendingTrustConnect: (url: URL, stableID: String, isManual: Bool)?
 
@@ -237,6 +239,9 @@ final class GatewayConnectionController {
         guard let cfg = appModel.activeGatewayConnectConfig else { return }
         guard appModel.gatewayAutoReconnectEnabled else { return }
 
+        self.refreshRegistrationGeneration &+= 1
+        let generation = self.refreshRegistrationGeneration
+
         Task { [weak self, weak appModel] in
             guard let self, let appModel else { return }
             let refreshedConfig = GatewayConnectConfig(
@@ -248,7 +253,8 @@ final class GatewayConnectionController {
                 password: cfg.password,
                 nodeOptions: await self.makeConnectOptions(stableID: cfg.stableID))
 
-            guard appModel.gatewayAutoReconnectEnabled,
+            guard generation == self.refreshRegistrationGeneration,
+                  appModel.gatewayAutoReconnectEnabled,
                   let latestConfig = appModel.activeGatewayConnectConfig,
                   latestConfig.effectiveStableID == cfg.effectiveStableID,
                   latestConfig.url == cfg.url
@@ -523,9 +529,18 @@ final class GatewayConnectionController {
     {
         guard let appModel else { return }
 
+        self.autoConnectGeneration &+= 1
+        let generation = self.autoConnectGeneration
+
         Task { [weak self, weak appModel] in
             guard let self, let appModel else { return }
             let connectOptions = await self.makeConnectOptions(stableID: gatewayStableID)
+
+            guard generation == self.autoConnectGeneration,
+                  appModel.gatewayAutoReconnectEnabled,
+                  appModel.activeGatewayConnectConfig == nil
+            else { return }
+
             await MainActor.run {
                 appModel.gatewayStatusText = "Connecting…"
             }
