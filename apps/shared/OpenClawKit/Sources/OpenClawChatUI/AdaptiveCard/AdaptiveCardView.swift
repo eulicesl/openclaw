@@ -26,35 +26,39 @@ struct AdaptiveCardView: View {
 
     // MARK: - Element rendering
 
-    @ViewBuilder
-    private func renderElement(_ element: CardElement) -> some View {
+    func renderElement(_ element: CardElement) -> some View {
+        self.renderElementBody(element)
+    }
+
+    // swiftlint:disable:this function_body_length
+    private func renderElementBody(_ element: CardElement) -> some View {
         switch element {
         case .textBlock(let tb):
-            self.renderTextBlock(tb)
+            return AnyView(self.renderTextBlock(tb))
         case .factSet(let fs):
-            self.renderFactSet(fs)
+            return AnyView(self.renderFactSet(fs))
         case .columnSet(let cs):
-            self.renderColumnSet(cs)
+            return AnyView(self.renderColumnSet(cs))
         case .container(let c):
-            self.renderContainer(c)
+            return AnyView(self.renderContainer(c))
         case .image(let img):
-            self.renderImage(img)
+            return AnyView(self.renderImage(img))
         case .table(let t):
-            self.renderTable(t)
+            return AnyView(self.renderTable(t))
         case .richTextBlock(let rtb):
-            self.renderRichTextBlock(rtb)
+            return AnyView(self.renderRichTextBlock(rtb))
         case .codeBlock(let cb):
-            self.renderCodeBlock(cb)
+            return AnyView(self.renderCodeBlock(cb))
         case .imageSet(let imgSet):
-            self.renderImageSet(imgSet)
+            return AnyView(self.renderImageSet(imgSet))
         case .actionSet(let actSet):
-            self.renderActions(actSet.actions)
+            return AnyView(self.renderActions(actSet.actions))
         case .icon(let ico):
-            self.renderIcon(ico)
+            return AnyView(self.renderIcon(ico))
         case .list(let lst):
-            self.renderList(lst)
+            return AnyView(self.renderList(lst))
         case .unknown:
-            EmptyView()
+            return AnyView(EmptyView())
         }
     }
 
@@ -102,7 +106,6 @@ struct AdaptiveCardView: View {
         }
     }
 
-    @ViewBuilder
     private func renderColumnSet(_ cs: CardElement.ColumnSet) -> some View {
         HStack(alignment: .top, spacing: 8) {
             ForEach(cs.columns.indices, id: \.self) { i in
@@ -156,7 +159,6 @@ struct AdaptiveCardView: View {
         }
     }
 
-    @ViewBuilder
     private func renderTable(_ table: CardElement.Table) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(table.rows.indices, id: \.self) { rowIdx in
