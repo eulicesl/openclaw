@@ -525,7 +525,11 @@ public final class OpenClawChatViewModel {
         self.pendingRuns.insert(runId)
         self.armPendingRunTimeout(runId: runId)
         self.pendingToolCallsById = [:]
-        self.streamingAssistantText = nil
+        // NOTE: we intentionally do NOT nil out streamingAssistantText here.
+        // keep the streaming bubble present (with the previous response text or empty)
+        // so the UI does not go blank while waiting for the first token.
+        // handleAgentEvent will overwrite this with real text once streaming starts.
+        self.streamingAssistantText = self.streamingAssistantText ?? ""
         self.pendingOptimisticMessageIds = []
 
         // Optimistically append user message to UI.

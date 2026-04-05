@@ -229,7 +229,9 @@ public struct OpenClawChatView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
 
-        if let text = self.viewModel.streamingAssistantText,
+        // Show the streaming bubble while sending to prevent the UI from going
+        // blank between the user hitting send and the first token arriving.
+        if let text = self.viewModel.streamingAssistantText, !text.isEmpty,
            AssistantTextParser.hasVisibleContent(in: text, includeThinking: self.showsAssistantTrace)
         {
             ChatStreamingAssistantBubble(
@@ -237,6 +239,15 @@ public struct OpenClawChatView: View {
                 markdownVariant: self.markdownVariant,
                 showsAssistantTrace: self.showsAssistantTrace)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        } else if self.viewModel.isSending && !self.viewModel.pendingToolCalls.isEmpty {
+            // Show an empty streaming bubble skeleton during the send window so the
+            // UI does not jump when the first token arrives.
+            ChatStreamingAssistantBubble(
+                text: "",
+                markdownVariant: self.markdownVariant,
+                showsAssistantTrace: self.showsAssistantTrace)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(0.4)
         }
     }
 
