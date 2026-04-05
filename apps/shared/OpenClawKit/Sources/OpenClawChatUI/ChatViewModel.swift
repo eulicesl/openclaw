@@ -36,6 +36,7 @@ public final class OpenClawChatViewModel {
     public private(set) var sessionKey: String
     public private(set) var sessionId: String?
     public private(set) var streamingAssistantText: String?
+    private var pendingOptimisticMessageIds: Set<UUID> = []
     public private(set) var pendingToolCalls: [OpenClawChatPendingToolCall] = []
     public private(set) var sessions: [OpenClawChatSessionEntry] = []
     private let transport: any OpenClawChatTransport
@@ -241,6 +242,7 @@ public final class OpenClawChatViewModel {
         self.clearPendingRuns(reason: nil)
         self.pendingToolCallsById = [:]
         self.streamingAssistantText = nil
+        self.pendingOptimisticMessageIds = []
         self.sessionId = nil
         defer { self.isLoading = false }
         do {
@@ -251,10 +253,15 @@ public final class OpenClawChatViewModel {
             }
 
             let payload = try await self.transport.requestHistory(sessionKey: self.sessionKey)
-            self.messages = Self.reconcileMessageIDs(
+            let decodedMessages = Self.decodeMessages(payload.messages ?? [])
+            self.messages = Self.reconcileRunRefreshMessages(
                 previous: self.messages,
-                incoming: Self.decodeMessages(payload.messages ?? []))
+                incoming: decodedMessages,
+                pendingOptimisticIds: self.pendingOptimisticMessageIds)
             self.sessionId = payload.sessionId
+            // Clear optimistic flags for messages now confirmed in history.
+            let confirmedIds = Set(decodedMessages.map { $0.id })
+            self.pendingOptimisticMessageIds = self.pendingOptimisticMessageIds.intersection(confirmedIds)
             if !self.prefersExplicitThinkingLevel,
                let level = Self.normalizedThinkingLevel(payload.thinkingLevel)
             {
@@ -396,7 +403,8 @@ public final class OpenClawChatViewModel {
 
     private static func reconcileRunRefreshMessages(
         previous: [OpenClawChatMessage],
-        incoming: [OpenClawChatMessage]) -> [OpenClawChatMessage]
+        incoming: [OpenClawChatMessage],
+        pendingOptimisticIds: Set<UUID> = []) -> [OpenClawChatMessage]
     {
         guard !previous.isEmpty else { return incoming }
         guard !incoming.isEmpty else { return previous }
@@ -442,6 +450,19 @@ public final class OpenClawChatViewModel {
                 }
                 return true
             }
+
+        // Preserve optimistically-appended messages that are not yet in incoming history.
+        // Preserve messages optimistically appended before history confirmed them.
+        // This prevents drops during the race window between append and history refresh.
+        if !pendingOptimisticIds.isEmpty {
+            let incomingIds = Set(reconciled.map { $0.id })
+            let toPreserve = previous.filter {
+                pendingOptimisticIds.contains($0.id) && !incomingIds.contains($0.id)
+            }
+            if !toPreserve.isEmpty {
+                reconciled.append(contentsOf: toPreserve)
+            }
+        }
 
         guard !trailingUserMessages.isEmpty else {
             return reconciled
@@ -524,6 +545,7 @@ public final class OpenClawChatViewModel {
         self.armPendingRunTimeout(runId: runId)
         self.pendingToolCallsById = [:]
         self.streamingAssistantText = nil
+        self.pendingOptimisticMessageIds = []
 
         // Optimistically append user message to UI.
         var userContent: [OpenClawChatMessageContent] = [
@@ -1272,11 +1294,13 @@ public final class OpenClawChatViewModel {
     @discardableResult
     private func appendFinalAssistantMessage(from chat: OpenClawChatEventPayload) -> Bool {
         if let message = self.decodedAssistantMessage(from: chat.message) {
+            self.pendingOptimisticMessageIds.insert(message.id)
             self.messages.append(message)
             return true
         }
         guard chat.state != "error" else { return false }
         if let streamed = self.streamedAssistantMessage() {
+            self.pendingOptimisticMessageIds.insert(streamed.id)
             self.messages.append(streamed)
             return true
         }
@@ -1314,10 +1338,15 @@ public final class OpenClawChatViewModel {
     private func refreshHistoryAfterRun() async {
         do {
             let payload = try await self.transport.requestHistory(sessionKey: self.sessionKey)
+            let decodedMessages = Self.decodeMessages(payload.messages ?? [])
             self.messages = Self.reconcileRunRefreshMessages(
                 previous: self.messages,
-                incoming: Self.decodeMessages(payload.messages ?? []))
+                incoming: decodedMessages,
+                pendingOptimisticIds: self.pendingOptimisticMessageIds)
             self.sessionId = payload.sessionId
+            // Clear optimistic flags for messages now confirmed in history.
+            let confirmedIds = Set(decodedMessages.map { $0.id })
+            self.pendingOptimisticMessageIds = self.pendingOptimisticMessageIds.intersection(confirmedIds)
             if !self.prefersExplicitThinkingLevel,
                let level = Self.normalizedThinkingLevel(payload.thinkingLevel)
             {
