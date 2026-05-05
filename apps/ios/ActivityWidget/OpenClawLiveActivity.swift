@@ -5,94 +5,231 @@ import WidgetKit
 struct OpenClawLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: OpenClawActivityAttributes.self) { context in
-            self.lockScreenView(context: context)
+            LockScreenView(context: context)
         } dynamicIsland: { context in
             DynamicIsland {
+                // MARK: Expanded
                 DynamicIslandExpandedRegion(.leading) {
-                    self.statusDot(state: context.state)
+                    AgentLabel(agentName: context.attributes.agentName)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(context.state.statusText)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                    ExpandedStatusView(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    self.trailingView(state: context.state)
+                    TrailingView(state: context.state)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    if let task = context.state.taskDescription {
+                        Text(task)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+                    }
                 }
             } compactLeading: {
-                self.statusDot(state: context.state)
+                // MARK: Compact Leading
+                CompactLeadingView(state: context.state)
             } compactTrailing: {
-                self.compactStatusIcon(state: context.state)
+                // MARK: Compact Trailing
+                CompactTrailingView(state: context.state)
             } minimal: {
-                self.statusDot(state: context.state)
+                // MARK: Minimal
+                MinimalView(state: context.state)
             }
         }
     }
+}
 
-    private func lockScreenView(context: ActivityViewContext<OpenClawActivityAttributes>) -> some View {
+// MARK: - Lock Screen
+
+private struct LockScreenView: View {
+    let context: ActivityViewContext<OpenClawActivityAttributes>
+
+    var body: some View {
         HStack(spacing: 10) {
-            self.statusIcon(state: context.state)
-                .frame(width: 30, height: 30)
-                .background(.thinMaterial, in: Circle())
+            StatusDot(state: context.state)
+                .frame(width: 10, height: 10)
+
             VStack(alignment: .leading, spacing: 2) {
-                Text("OpenClaw")
+                Text(context.attributes.agentName)
                     .font(.subheadline.bold())
-                    .lineLimit(1)
-                Text(context.state.statusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if let task = context.state.taskDescription {
+                    Text(task)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text(context.state.statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
+
             Spacer()
-            self.trailingView(state: context.state)
+            TrailingView(state: context.state)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
     }
+}
 
-    @ViewBuilder
-    private func trailingView(state: OpenClawActivityAttributes.ContentState) -> some View {
-        self.statusIcon(state: state)
-            .font(.system(size: 16, weight: .semibold))
-            .frame(width: 28, height: 28)
+// MARK: - Expanded views
+
+private struct AgentLabel: View {
+    let agentName: String
+
+    var body: some View {
+        Label(agentName, systemImage: "cpu")
+            .font(.caption.bold())
+            .foregroundStyle(.primary)
+            .lineLimit(1)
     }
+}
 
-    private func statusDot(state: OpenClawActivityAttributes.ContentState) -> some View {
+private struct ExpandedStatusView: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
+        Group {
+            if state.isWorking {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(.blue)
+                    Text(state.taskDescription ?? "Working…")
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                }
+            } else {
+                Text(state.statusText)
+                    .font(.subheadline)
+                    .lineLimit(1)
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+        .animation(.easeInOut(duration: 0.2), value: state.isWorking)
+    }
+}
+
+// MARK: - Compact views
+
+private struct CompactLeadingView: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
+        if state.isWorking {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(.blue)
+        } else {
+            StatusDot(state: state)
+        }
+    }
+}
+
+private struct CompactTrailingView: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
+        if state.isWorking, let task = state.taskDescription {
+            Text(task)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(maxWidth: 80)
+        } else {
+            Text(state.statusText)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: 64)
+        }
+    }
+}
+
+private struct MinimalView: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
+        if state.isWorking {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(.blue)
+        } else {
+            StatusDot(state: state)
+        }
+    }
+}
+
+// MARK: - Shared subviews
+
+private struct TrailingView: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
+        Group {
+            if state.isConnecting {
+                ProgressView().controlSize(.small)
+            } else if state.isDisconnected {
+                Image(systemName: "wifi.slash")
+                    .foregroundStyle(.red)
+            } else if state.isWorking {
+                // Elapsed timer shows how long the agent has been working.
+                Text(state.startedAt, style: .timer)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else if state.isIdle {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .foregroundStyle(.green)
+            }
+        }
+    }
+}
+
+private struct StatusDot: View {
+    let state: OpenClawActivityAttributes.ContentState
+
+    var body: some View {
         Circle()
-            .fill(self.dotColor(state: state))
+            .fill(dotColor)
             .frame(width: 6, height: 6)
     }
 
-    @ViewBuilder
-    private func compactStatusIcon(state: OpenClawActivityAttributes.ContentState) -> some View {
-        self.statusIcon(state: state)
-            .font(.system(size: 12, weight: .semibold))
-            .frame(width: 18, height: 18)
-    }
-
-    @ViewBuilder
-    private func statusIcon(state: OpenClawActivityAttributes.ContentState) -> some View {
-        if state.isConnecting {
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .foregroundStyle(.cyan)
-        } else if state.isDisconnected {
-            Image(systemName: "wifi.slash")
-                .foregroundStyle(.red)
-        } else if state.isIdle {
-            Image(systemName: "checkmark")
-                .foregroundStyle(.green)
-        } else {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-        }
-    }
-
-    private func dotColor(state: OpenClawActivityAttributes.ContentState) -> Color {
+    private var dotColor: Color {
         if state.isDisconnected { return .red }
-        if state.isConnecting { return .cyan }
+        if state.isConnecting { return .gray }
+        if state.isWorking { return .blue }
         if state.isIdle { return .green }
-        return .orange
+        return .secondary
     }
+}
+
+// MARK: - Previews
+
+#Preview("Compact — Idle", as: .dynamicIsland(.compact), using: OpenClawActivityAttributes.preview) {
+    OpenClawLiveActivity()
+} contentStates: {
+    OpenClawActivityAttributes.ContentState.idle
+}
+
+#Preview("Compact — Working", as: .dynamicIsland(.compact), using: OpenClawActivityAttributes.preview) {
+    OpenClawLiveActivity()
+} contentStates: {
+    OpenClawActivityAttributes.ContentState.working(task: "Building iOS app…")
+}
+
+#Preview("Expanded — Working", as: .dynamicIsland(.expanded), using: OpenClawActivityAttributes.preview) {
+    OpenClawLiveActivity()
+} contentStates: {
+    OpenClawActivityAttributes.ContentState.working(task: "Running tests…")
+}
+
+#Preview("Lock Screen", as: .content, using: OpenClawActivityAttributes.preview) {
+    OpenClawLiveActivity()
+} contentStates: {
+    OpenClawActivityAttributes.ContentState.working(task: "Capturing screenshot…")
+    OpenClawActivityAttributes.ContentState.idle
+    OpenClawActivityAttributes.ContentState.disconnected
 }
