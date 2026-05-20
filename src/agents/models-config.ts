@@ -7,13 +7,18 @@ import {
   type OpenClawConfig,
 } from "../config/config.js";
 import { createConfigRuntimeEnv } from "../config/env-vars.js";
+import { privateFileStore } from "../infra/private-file-store.js";
 import { getCurrentPluginMetadataSnapshot } from "../plugins/current-plugin-metadata-snapshot.js";
 import { resolveInstalledManifestRegistryIndexFingerprint } from "../plugins/manifest-registry-installed.js";
 import type { PluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
-import { resolveOpenClawAgentDir } from "./agent-paths.js";
-import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "./agent-scope.js";
+import {
+  resolveAgentWorkspaceDir,
+  resolveDefaultAgentDir,
+  resolveDefaultAgentId,
+} from "./agent-scope.js";
 import { MODELS_JSON_STATE } from "./models-config-state.js";
 import { planOpenClawModelsJson } from "./models-config.plan.js";
+import { stableStringify } from "./stable-stringify.js";
 
 export { resetModelsJsonReadyCacheForTest } from "./models-config-state.js";
 
@@ -26,27 +31,15 @@ async function readFileMtimeMs(pathname: string): Promise<number | null> {
   }
 }
 
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
-  }
-  const entries = Object.entries(value as Record<string, unknown>).toSorted(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return `{${entries
-    .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
-    .join(",")}}`;
-}
-
 async function buildModelsJsonFingerprint(params: {
   config: OpenClawConfig;
   sourceConfigForSecrets: OpenClawConfig;
   agentDir: string;
   workspaceDir?: string;
   pluginMetadataSnapshot?: Pick<PluginMetadataSnapshot, "index">;
+  providerDiscoveryProviderIds?: readonly string[];
+  providerDiscoveryTimeoutMs?: number;
+  providerDiscoveryEntriesOnly?: boolean;
 }): Promise<string> {
   const authProfilesMtimeMs = await readFileMtimeMs(
     path.join(params.agentDir, "auth-profiles.json"),
@@ -64,7 +57,14 @@ async function buildModelsJsonFingerprint(params: {
     modelsFileMtimeMs,
     workspaceDir: params.workspaceDir,
     pluginMetadataSnapshotIndexFingerprint,
+    providerDiscoveryProviderIds: params.providerDiscoveryProviderIds,
+    providerDiscoveryTimeoutMs: params.providerDiscoveryTimeoutMs,
+    providerDiscoveryEntriesOnly: params.providerDiscoveryEntriesOnly === true,
   });
+}
+
+function modelsJsonReadyCacheKey(targetPath: string, fingerprint: string): string {
+  return `${targetPath}\0${fingerprint}`;
 }
 
 async function readExistingModelsFile(pathname: string): Promise<{
@@ -72,7 +72,15 @@ async function readExistingModelsFile(pathname: string): Promise<{
   parsed: unknown;
 }> {
   try {
-    const raw = await fs.readFile(pathname, "utf8");
+    const raw = await privateFileStore(path.dirname(pathname)).readTextIfExists(
+      path.basename(pathname),
+    );
+    if (raw === null) {
+      return {
+        raw: "",
+        parsed: null,
+      };
+    }
     return {
       raw,
       parsed: JSON.parse(raw) as unknown,
@@ -95,9 +103,7 @@ export async function writeModelsFileAtomicForModelsJson(
   targetPath: string,
   contents: string,
 ): Promise<void> {
-  const tempPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
-  await fs.writeFile(tempPath, contents, { mode: 0o600 });
-  await fs.rename(tempPath, targetPath);
+  await privateFileStore(path.dirname(targetPath)).writeText(path.basename(targetPath), contents);
 }
 
 function resolveModelsConfigInput(config?: OpenClawConfig): {
@@ -152,6 +158,9 @@ export async function ensureOpenClawModelsJson(
   options: {
     pluginMetadataSnapshot?: Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">;
     workspaceDir?: string;
+    providerDiscoveryProviderIds?: readonly string[];
+    providerDiscoveryTimeoutMs?: number;
+    providerDiscoveryEntriesOnly?: boolean;
   } = {},
 ): Promise<{ agentDir: string; wrote: boolean }> {
   const resolved = resolveModelsConfigInput(config);
@@ -167,7 +176,7 @@ export async function ensureOpenClawModelsJson(
       config: cfg,
       ...(workspaceDir ? { workspaceDir } : {}),
     });
-  const agentDir = agentDirOverride?.trim() ? agentDirOverride.trim() : resolveOpenClawAgentDir();
+  const agentDir = agentDirOverride?.trim() ? agentDirOverride.trim() : resolveDefaultAgentDir(cfg);
   const targetPath = path.join(agentDir, "models.json");
   const fingerprint = await buildModelsJsonFingerprint({
     config: cfg,
@@ -175,14 +184,22 @@ export async function ensureOpenClawModelsJson(
     agentDir,
     ...(workspaceDir ? { workspaceDir } : {}),
     ...(pluginMetadataSnapshot ? { pluginMetadataSnapshot } : {}),
+    ...(options.providerDiscoveryProviderIds
+      ? { providerDiscoveryProviderIds: options.providerDiscoveryProviderIds }
+      : {}),
+    ...(options.providerDiscoveryTimeoutMs !== undefined
+      ? { providerDiscoveryTimeoutMs: options.providerDiscoveryTimeoutMs }
+      : {}),
+    ...(options.providerDiscoveryEntriesOnly === true
+      ? { providerDiscoveryEntriesOnly: true }
+      : {}),
   });
-  const cached = MODELS_JSON_STATE.readyCache.get(targetPath);
+  const cacheKey = modelsJsonReadyCacheKey(targetPath, fingerprint);
+  const cached = MODELS_JSON_STATE.readyCache.get(cacheKey);
   if (cached) {
     const settled = await cached;
-    if (settled.fingerprint === fingerprint) {
-      await ensureModelsFileModeForModelsJson(targetPath);
-      return settled.result;
-    }
+    await ensureModelsFileModeForModelsJson(targetPath);
+    return settled.result;
   }
 
   const pending = withModelsJsonWriteLock(targetPath, async () => {
@@ -199,6 +216,15 @@ export async function ensureOpenClawModelsJson(
       existingRaw: existingModelsFile.raw,
       existingParsed: existingModelsFile.parsed,
       ...(pluginMetadataSnapshot ? { pluginMetadataSnapshot } : {}),
+      ...(options.providerDiscoveryProviderIds
+        ? { providerDiscoveryProviderIds: options.providerDiscoveryProviderIds }
+        : {}),
+      ...(options.providerDiscoveryTimeoutMs !== undefined
+        ? { providerDiscoveryTimeoutMs: options.providerDiscoveryTimeoutMs }
+        : {}),
+      ...(options.providerDiscoveryEntriesOnly === true
+        ? { providerDiscoveryEntriesOnly: true }
+        : {}),
     });
 
     if (plan.action === "skip") {
@@ -215,13 +241,37 @@ export async function ensureOpenClawModelsJson(
     await ensureModelsFileModeForModelsJson(targetPath);
     return { fingerprint, result: { agentDir, wrote: true } };
   });
-  MODELS_JSON_STATE.readyCache.set(targetPath, pending);
+  MODELS_JSON_STATE.readyCache.set(cacheKey, pending);
   try {
     const settled = await pending;
+    const refreshedFingerprint = await buildModelsJsonFingerprint({
+      config: cfg,
+      sourceConfigForSecrets: resolved.sourceConfigForSecrets,
+      agentDir,
+      ...(workspaceDir ? { workspaceDir } : {}),
+      ...(pluginMetadataSnapshot ? { pluginMetadataSnapshot } : {}),
+      ...(options.providerDiscoveryProviderIds
+        ? { providerDiscoveryProviderIds: options.providerDiscoveryProviderIds }
+        : {}),
+      ...(options.providerDiscoveryTimeoutMs !== undefined
+        ? { providerDiscoveryTimeoutMs: options.providerDiscoveryTimeoutMs }
+        : {}),
+      ...(options.providerDiscoveryEntriesOnly === true
+        ? { providerDiscoveryEntriesOnly: true }
+        : {}),
+    });
+    const refreshedCacheKey = modelsJsonReadyCacheKey(targetPath, refreshedFingerprint);
+    if (refreshedCacheKey !== cacheKey) {
+      MODELS_JSON_STATE.readyCache.delete(cacheKey);
+      MODELS_JSON_STATE.readyCache.set(
+        refreshedCacheKey,
+        Promise.resolve({ fingerprint: refreshedFingerprint, result: settled.result }),
+      );
+    }
     return settled.result;
   } catch (error) {
-    if (MODELS_JSON_STATE.readyCache.get(targetPath) === pending) {
-      MODELS_JSON_STATE.readyCache.delete(targetPath);
+    if (MODELS_JSON_STATE.readyCache.get(cacheKey) === pending) {
+      MODELS_JSON_STATE.readyCache.delete(cacheKey);
     }
     throw error;
   }

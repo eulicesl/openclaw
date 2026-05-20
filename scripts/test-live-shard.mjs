@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,16 +7,30 @@ import { spawnPnpmRunner } from "./pnpm-runner.mjs";
 
 const LIVE_TEST_SUFFIX = ".live.test.ts";
 
-export const LIVE_TEST_SHARDS = Object.freeze([
+export const RELEASE_LIVE_TEST_SHARDS = Object.freeze([
   "native-live-src-agents",
   "native-live-src-gateway-core",
+  "native-live-src-gateway-profiles",
   "native-live-src-gateway-backends",
+  "native-live-src-infra",
   "native-live-test",
   "native-live-extensions-a-k",
   "native-live-extensions-l-n",
+  "native-live-extensions-moonshot",
   "native-live-extensions-openai",
+  "native-live-extensions-o-z-other",
+  "native-live-extensions-xai",
+  "native-live-extensions-media-audio",
+  "native-live-extensions-media-music-google",
+  "native-live-extensions-media-music-minimax",
+  "native-live-extensions-media-video",
+]);
+
+export const LIVE_TEST_SHARDS = Object.freeze([
+  ...RELEASE_LIVE_TEST_SHARDS,
   "native-live-extensions-o-z",
   "native-live-extensions-media",
+  "native-live-extensions-media-music",
 ]);
 
 function walkFiles(rootDir) {
@@ -50,10 +65,80 @@ function walkFiles(rootDir) {
 }
 
 export function collectAllLiveTestFiles(repoRoot = process.cwd()) {
+  const externalFiles = listExternalLiveTestFiles(repoRoot);
+  if (externalFiles) {
+    return externalFiles;
+  }
   return ["src", "test", "extensions"]
     .flatMap((dir) => walkFiles(path.join(repoRoot, dir)))
     .map((file) => path.relative(repoRoot, file).split(path.sep).join("/"))
     .filter((file) => file.endsWith(LIVE_TEST_SUFFIX))
+    .toSorted((a, b) => a.localeCompare(b));
+}
+
+function listExternalLiveTestFiles(repoRoot) {
+  return listGitLiveTestFiles(repoRoot) ?? listFindLiveTestFiles(repoRoot);
+}
+
+function listGitLiveTestFiles(repoRoot) {
+  const result = spawnSync("git", ["ls-files", "--", "src", "test", "extensions"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024 * 4,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (result.status !== 0) {
+    return null;
+  }
+  return result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((file) => file.endsWith(LIVE_TEST_SUFFIX))
+    .toSorted((a, b) => a.localeCompare(b));
+}
+
+function listFindLiveTestFiles(repoRoot) {
+  const roots = ["src", "test", "extensions"].map((dir) => path.join(repoRoot, dir));
+  const result = spawnSync(
+    "find",
+    [
+      ...roots,
+      "(",
+      "-name",
+      "node_modules",
+      "-o",
+      "-name",
+      "dist",
+      "-o",
+      "-name",
+      "vendor",
+      "-o",
+      "-name",
+      "fixtures",
+      ")",
+      "-prune",
+      "-o",
+      "-type",
+      "f",
+      "-name",
+      `*${LIVE_TEST_SUFFIX}`,
+      "-print",
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 4,
+      stdio: ["ignore", "pipe", "ignore"],
+    },
+  );
+  if (result.status !== 0) {
+    return null;
+  }
+  return result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((file) => file.length > 0)
+    .map((file) => path.relative(repoRoot, file).split(path.sep).join("/"))
     .toSorted((a, b) => a.localeCompare(b));
 }
 
@@ -83,6 +168,10 @@ function isGatewayBackendLiveTest(file) {
   );
 }
 
+function isGatewayProfilesLiveTest(file) {
+  return file === "src/gateway/gateway-models.profiles.live.test.ts";
+}
+
 function isExtensionMediaLiveTest(file) {
   return (
     file === "extensions/music-generation-providers.live.test.ts" ||
@@ -92,6 +181,30 @@ function isExtensionMediaLiveTest(file) {
     file === "extensions/volcengine/tts.live.test.ts" ||
     file === "extensions/vydra/vydra.live.test.ts"
   );
+}
+
+function isExtensionMediaMusicLiveTest(file) {
+  return file === "extensions/music-generation-providers.live.test.ts";
+}
+
+function isExtensionMediaVideoLiveTest(file) {
+  return file === "extensions/video-generation-providers.live.test.ts";
+}
+
+function isExtensionMediaAudioLiveTest(file) {
+  return (
+    isExtensionMediaLiveTest(file) &&
+    !isExtensionMediaMusicLiveTest(file) &&
+    !isExtensionMediaVideoLiveTest(file)
+  );
+}
+
+function isXaiLiveTest(file) {
+  return file.startsWith("extensions/xai/");
+}
+
+function isMoonshotLiveTest(file) {
+  return file.startsWith("extensions/moonshot/");
 }
 
 export function selectLiveShardFiles(shard, files = collectAllLiveTestFiles()) {
@@ -106,10 +219,15 @@ export function selectLiveShardFiles(shard, files = collectAllLiveTestFiles()) {
       return files.filter(
         (file) =>
           (file.startsWith("src/gateway/") || file.startsWith("src/crestodian/")) &&
-          !isGatewayBackendLiveTest(file),
+          !isGatewayBackendLiveTest(file) &&
+          !isGatewayProfilesLiveTest(file),
       );
+    case "native-live-src-gateway-profiles":
+      return files.filter(isGatewayProfilesLiveTest);
     case "native-live-src-gateway-backends":
       return files.filter(isGatewayBackendLiveTest);
+    case "native-live-src-infra":
+      return files.filter((file) => file.startsWith("src/infra/"));
     case "native-live-test":
       return files.filter((file) => file.startsWith("test/"));
     case "native-live-extensions-a-k":
@@ -119,8 +237,11 @@ export function selectLiveShardFiles(shard, files = collectAllLiveTestFiles()) {
         (file) =>
           isExtensionInRange(file, "l", "n") &&
           !file.startsWith("extensions/openai/") &&
+          !isMoonshotLiveTest(file) &&
           !isExtensionMediaLiveTest(file),
       );
+    case "native-live-extensions-moonshot":
+      return files.filter(isMoonshotLiveTest);
     case "native-live-extensions-openai":
       return files.filter(
         (file) => file.startsWith("extensions/openai/") && !isExtensionMediaLiveTest(file),
@@ -132,8 +253,26 @@ export function selectLiveShardFiles(shard, files = collectAllLiveTestFiles()) {
           !file.startsWith("extensions/openai/") &&
           !isExtensionMediaLiveTest(file),
       );
+    case "native-live-extensions-o-z-other":
+      return files.filter(
+        (file) =>
+          isExtensionInRange(file, "o", "z") &&
+          !file.startsWith("extensions/openai/") &&
+          !isExtensionMediaLiveTest(file) &&
+          !isXaiLiveTest(file),
+      );
+    case "native-live-extensions-xai":
+      return files.filter(isXaiLiveTest);
     case "native-live-extensions-media":
       return files.filter(isExtensionMediaLiveTest);
+    case "native-live-extensions-media-audio":
+      return files.filter(isExtensionMediaAudioLiveTest);
+    case "native-live-extensions-media-music":
+    case "native-live-extensions-media-music-google":
+    case "native-live-extensions-media-music-minimax":
+      return files.filter(isExtensionMediaMusicLiveTest);
+    case "native-live-extensions-media-video":
+      return files.filter(isExtensionMediaVideoLiveTest);
     case "native-live-extensions-l-z":
       return files.filter((file) => isExtensionInRange(file, "l", "z"));
     default:

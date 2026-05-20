@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createTestPluginApi } from "openclaw/plugin-sdk/plugin-test-api";
 import { describe, expect, it, vi } from "vitest";
-import { createTestPluginApi } from "../../test/helpers/plugins/plugin-api.js";
 import registerPhoneControl from "./index.js";
 import type {
   OpenClawPluginApi,
@@ -31,6 +31,25 @@ function createApi(params: {
       },
       config: {
         current: () => params.getConfig(),
+        mutateConfigFile: async ({
+          mutate,
+        }: {
+          mutate: (draft: Record<string, unknown>) => void;
+        }) => {
+          const nextConfig = structuredClone(params.getConfig());
+          mutate(nextConfig);
+          await params.writeConfig(nextConfig);
+          return {
+            path: "/tmp/openclaw.json",
+            previousHash: null,
+            persistedHash: null,
+            snapshot: {},
+            nextConfig,
+            afterWrite: { mode: "auto" },
+            followUp: { mode: "auto", requiresRestart: false },
+            result: undefined,
+          };
+        },
         replaceConfigFile: ({ nextConfig }: { nextConfig: unknown }) =>
           params.writeConfig(nextConfig as Record<string, unknown>),
       },
@@ -126,7 +145,7 @@ describe("phone-control plugin", () => {
 
       expect(writeConfigFile).toHaveBeenCalledTimes(1);
       expect(nodes.allowCommands).toEqual([...WRITE_COMMANDS]);
-      expect(nodes.denyCommands).toEqual([]);
+      expect(nodes.denyCommands).toStrictEqual([]);
       expect(text).toContain("sms.send");
     });
   });

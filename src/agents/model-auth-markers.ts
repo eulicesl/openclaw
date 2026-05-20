@@ -1,10 +1,12 @@
 import type { SecretRefSource } from "../config/types.secrets.js";
-import { loadPluginManifestRegistryForPluginRegistry } from "../plugins/plugin-registry.js";
+import { listOpenClawPluginManifestMetadata } from "../plugins/manifest-metadata-scan.js";
 import { listKnownProviderEnvApiKeyNames } from "./model-auth-env-vars.js";
 
+/** @deprecated MiniMax provider-owned marker; do not use from third-party plugins. */
 export const MINIMAX_OAUTH_MARKER = "minimax-oauth";
 export const OAUTH_API_KEY_MARKER_PREFIX = "oauth:";
 export const OLLAMA_LOCAL_AUTH_MARKER = "ollama-local";
+/** @deprecated Bundled local-provider marker; do not use from third-party plugins. */
 export const CUSTOM_LOCAL_AUTH_MARKER = "custom-local";
 export const GCP_VERTEX_CREDENTIALS_MARKER = "gcp-vertex-credentials";
 export const NON_ENV_SECRETREF_MARKER = "secretref-managed"; // pragma: allowlist secret
@@ -35,6 +37,13 @@ const LEGACY_ENV_API_KEY_MARKERS = [
   "MINIMAX_CODE_PLAN_KEY",
 ];
 
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((entry) => (typeof entry === "string" ? entry.trim() : "")).filter(Boolean);
+}
+
 function listKnownEnvApiKeyMarkers(): Set<string> {
   knownEnvApiKeyMarkersCache ??= new Set([
     ...listKnownProviderEnvApiKeyNames(),
@@ -48,8 +57,10 @@ export function listKnownNonSecretApiKeyMarkers(): string[] {
   knownNonSecretApiKeyMarkersCache ??= [
     ...new Set([
       ...CORE_NON_SECRET_API_KEY_MARKERS,
-      ...loadPluginManifestRegistryForPluginRegistry({ includeDisabled: true }).plugins.flatMap(
-        (plugin) => (plugin.origin === "bundled" ? (plugin.nonSecretAuthMarkers ?? []) : []),
+      ...listOpenClawPluginManifestMetadata().flatMap((plugin) =>
+        plugin.origin === "bundled"
+          ? normalizeStringList(plugin.manifest.nonSecretAuthMarkers)
+          : [],
       ),
     ]),
   ];

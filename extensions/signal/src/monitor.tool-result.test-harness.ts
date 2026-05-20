@@ -1,4 +1,4 @@
-import type { MockFn } from "openclaw/plugin-sdk/testing";
+import type { MockFn } from "openclaw/plugin-sdk/plugin-test-runtime";
 import { beforeEach, vi } from "vitest";
 import type { SignalDaemonExitEvent, SignalDaemonHandle } from "./daemon.js";
 
@@ -72,11 +72,6 @@ export function createSignalToolResultConfig(
       },
     },
   };
-}
-
-export async function flush() {
-  await Promise.resolve();
-  await Promise.resolve();
 }
 
 export function createMockSignalDaemonHandle(
@@ -188,8 +183,14 @@ vi.mock("./client.js", () => ({
   signalRpcRequest: (...args: unknown[]) => signalRpcRequestMock(...args),
 }));
 
-vi.mock("./daemon.js", async () => {
-  const actual = await vi.importActual<typeof import("./daemon.js")>("./daemon.js");
+vi.mock("./client-adapter.js", () => ({
+  streamSignalEvents: (...args: unknown[]) => streamMock(...args),
+  signalCheck: (...args: unknown[]) => signalCheckMock(...args),
+  signalRpcRequest: (...args: unknown[]) => signalRpcRequestMock(...args),
+}));
+
+vi.mock("./daemon.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./daemon.js")>();
   return {
     ...actual,
     spawnSignalDaemon: (...args: unknown[]) => spawnSignalDaemonMock(...args),

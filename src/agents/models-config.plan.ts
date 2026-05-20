@@ -9,6 +9,7 @@ import {
 import {
   applyNativeStreamingUsageCompat,
   enforceSourceManagedProviderSecrets,
+  normalizeProviderCatalogModelsForConfig,
   normalizeProviders,
   resolveImplicitProviders,
   type ProviderConfig,
@@ -22,6 +23,9 @@ export type ResolveImplicitProvidersForModelsJson = (params: {
   workspaceDir?: string;
   explicitProviders: Record<string, ProviderConfig>;
   pluginMetadataSnapshot?: Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">;
+  providerDiscoveryProviderIds?: readonly string[];
+  providerDiscoveryTimeoutMs?: number;
+  providerDiscoveryEntriesOnly?: boolean;
 }) => Promise<Record<string, ProviderConfig>>;
 
 export type ModelsJsonPlan =
@@ -43,6 +47,9 @@ export async function resolveProvidersForModelsJsonWithDeps(
     env: NodeJS.ProcessEnv;
     workspaceDir?: string;
     pluginMetadataSnapshot?: Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">;
+    providerDiscoveryProviderIds?: readonly string[];
+    providerDiscoveryTimeoutMs?: number;
+    providerDiscoveryEntriesOnly?: boolean;
   },
   deps?: {
     resolveImplicitProviders?: ResolveImplicitProvidersForModelsJson;
@@ -60,6 +67,13 @@ export async function resolveProvidersForModelsJsonWithDeps(
     ...(params.pluginMetadataSnapshot
       ? { pluginMetadataSnapshot: params.pluginMetadataSnapshot }
       : {}),
+    ...(params.providerDiscoveryProviderIds
+      ? { providerDiscoveryProviderIds: params.providerDiscoveryProviderIds }
+      : {}),
+    ...(params.providerDiscoveryTimeoutMs !== undefined
+      ? { providerDiscoveryTimeoutMs: params.providerDiscoveryTimeoutMs }
+      : {}),
+    ...(params.providerDiscoveryEntriesOnly === true ? { providerDiscoveryEntriesOnly: true } : {}),
   });
   return mergeProviders({
     implicit: implicitProviders,
@@ -101,6 +115,9 @@ export async function planOpenClawModelsJsonWithDeps(
     existingRaw: string;
     existingParsed: unknown;
     pluginMetadataSnapshot?: Pick<PluginMetadataSnapshot, "index" | "manifestRegistry" | "owners">;
+    providerDiscoveryProviderIds?: readonly string[];
+    providerDiscoveryTimeoutMs?: number;
+    providerDiscoveryEntriesOnly?: boolean;
   },
   deps?: {
     resolveImplicitProviders?: ResolveImplicitProvidersForModelsJson;
@@ -115,6 +132,15 @@ export async function planOpenClawModelsJsonWithDeps(
       ...(params.workspaceDir ? { workspaceDir: params.workspaceDir } : {}),
       ...(params.pluginMetadataSnapshot
         ? { pluginMetadataSnapshot: params.pluginMetadataSnapshot }
+        : {}),
+      ...(params.providerDiscoveryProviderIds
+        ? { providerDiscoveryProviderIds: params.providerDiscoveryProviderIds }
+        : {}),
+      ...(params.providerDiscoveryTimeoutMs !== undefined
+        ? { providerDiscoveryTimeoutMs: params.providerDiscoveryTimeoutMs }
+        : {}),
+      ...(params.providerDiscoveryEntriesOnly === true
+        ? { providerDiscoveryEntriesOnly: true }
         : {}),
     },
     deps,
@@ -142,13 +168,15 @@ export async function planOpenClawModelsJsonWithDeps(
     providers: normalizedProviders,
     secretRefManagedProviders,
   });
+  const normalizedMergedProviders =
+    normalizeProviderCatalogModelsForConfig(mergedProviders) ?? mergedProviders;
   const secretEnforcedProviders =
     enforceSourceManagedProviderSecrets({
-      providers: mergedProviders,
+      providers: normalizedMergedProviders,
       sourceProviders: params.sourceConfigForSecrets?.models?.providers,
       sourceSecretDefaults: params.sourceConfigForSecrets?.secrets?.defaults,
       secretRefManagedProviders,
-    }) ?? mergedProviders;
+    }) ?? normalizedMergedProviders;
   const finalProviders = applyNativeStreamingUsageCompat(secretEnforcedProviders);
   const nextContents = `${JSON.stringify({ providers: finalProviders }, null, 2)}\n`;
 
