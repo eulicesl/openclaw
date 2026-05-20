@@ -141,14 +141,14 @@ final class LiveActivityManager {
             self.updateCurrent(state: self.workingState(task: task), staleDate: nil)
             self.logger.info("live activity working task=\(task, privacy: .private)")
         } else {
-            let restored: OpenClawActivityAttributes.ContentState
-            switch self.lastConnectionState {
-            case .idle: restored = self.idleState()
-            case .connecting: restored = self.connectingState()
-            case .disconnected: restored = self.disconnectedState()
+            let restored: OpenClawActivityAttributes.ContentState = switch self.lastConnectionState {
+            case .idle: self.idleState()
+            case .connecting: self.connectingState()
+            case .disconnected: self.disconnectedState()
             }
             self.updateCurrent(state: restored, staleDate: nil)
-            self.logger.info("live activity restored state=\(String(describing: self.lastConnectionState), privacy: .public)")
+            self.logger
+                .info("live activity restored state=\(String(describing: self.lastConnectionState), privacy: .public)")
         }
     }
 
@@ -299,14 +299,13 @@ final class LiveActivityManager {
     }
 
     private func workingState(task: String) -> OpenClawActivityAttributes.ContentState {
-        let startedAt: Date
-        if let current = self.currentActivity,
-           current.content.state.isWorking,
-           current.content.state.taskDescription == task
+        let startedAt: Date = if let current = self.currentActivity,
+                                 current.content.state.isWorking,
+                                 current.content.state.taskDescription == task
         {
-            startedAt = current.content.state.startedAt
+            current.content.state.startedAt
         } else {
-            startedAt = .now
+            .now
         }
 
         return OpenClawActivityAttributes.ContentState(

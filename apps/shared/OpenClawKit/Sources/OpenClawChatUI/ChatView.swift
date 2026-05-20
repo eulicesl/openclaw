@@ -214,7 +214,7 @@ public struct OpenClawChatView: View {
                     alignment: msg.role.lowercased() == "user" ? .trailing : .leading)
         }
 
-        if self.viewModel.pendingRunCount > 0 && !self.hasVisibleStreamingAssistantText {
+        if self.viewModel.pendingRunCount > 0, !self.hasVisibleStreamingAssistantText {
             HStack {
                 ChatTypingIndicatorBubble(style: self.style)
                     .equatable()
@@ -238,7 +238,7 @@ public struct OpenClawChatView: View {
                 markdownVariant: self.markdownVariant,
                 showsAssistantTrace: self.showsAssistantTrace)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if self.viewModel.isSending && !self.viewModel.pendingToolCalls.isEmpty {
+        } else if self.viewModel.isSending, !self.viewModel.pendingToolCalls.isEmpty {
             // Show an empty streaming bubble skeleton during the send window so the
             // UI does not jump when the first token arrives.
             ChatStreamingAssistantBubble(

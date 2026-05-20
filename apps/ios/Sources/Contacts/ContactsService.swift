@@ -97,7 +97,7 @@ final class ContactsService: ContactsServicing {
         return OpenClawContactsAddPayload(contact: Self.payload(from: persisted))
     }
 
-    private static func ensureAuthorization(status: CNAuthorizationStatus) async -> Bool {
+    private static func ensureAuthorization(store: CNContactStore, status: CNAuthorizationStatus) async -> Bool {
         switch status {
         case .authorized, .limited:
             return true
@@ -115,14 +115,15 @@ final class ContactsService: ContactsServicing {
     }
 
     private static func authorizedStore() async throws -> CNContactStore {
+        let store = CNContactStore()
         let status = CNContactStore.authorizationStatus(for: .contacts)
-        let authorized = await Self.ensureAuthorization(status: status)
+        let authorized = await Self.ensureAuthorization(store: store, status: status)
         guard authorized else {
             throw NSError(domain: "Contacts", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "CONTACTS_PERMISSION_REQUIRED: grant Contacts permission",
             ])
         }
-        return CNContactStore()
+        return store
     }
 
     private static func normalizeStrings(_ values: [String]?, lowercased: Bool = false) -> [String] {

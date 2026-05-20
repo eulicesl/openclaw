@@ -26,8 +26,9 @@ struct VoiceWakeWordsSettingsView: View {
                 } label: {
                     Label("Add word", systemImage: "plus")
                 }
-                .disabled(self.triggerWords
-                    .contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
+                .disabled(
+                    self.triggerWords
+                        .contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
 
                 Button("Reset defaults") {
                     self.triggerWords = VoiceWakePreferences.defaultTriggerWords

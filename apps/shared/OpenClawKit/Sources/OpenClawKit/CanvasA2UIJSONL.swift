@@ -55,8 +55,9 @@ public enum OpenClawCanvasA2UIJSONL: Sendable {
                 let found = dict.keys.sorted().joined(separator: ", ")
                 throw NSError(domain: "A2UI", code: 3, userInfo: [
                     NSLocalizedDescriptionKey: """
-                    A2UI JSONL line \(item.lineNumber): expected exactly one of \(allowed.sorted()
-                        .joined(separator: ", ")); found: \(found)
+                    A2UI JSONL line \(item.lineNumber): expected exactly one of \(
+                        allowed.sorted()
+                            .joined(separator: ", ")); found: \(found)
                     """,
                 ])
             }

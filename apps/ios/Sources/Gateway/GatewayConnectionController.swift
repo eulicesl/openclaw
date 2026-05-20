@@ -285,14 +285,14 @@ final class GatewayConnectionController {
     private static func sameTLSParams(_ lhs: GatewayTLSParams?, _ rhs: GatewayTLSParams?) -> Bool {
         switch (lhs, rhs) {
         case (nil, nil):
-            return true
+            true
         case let (lhs?, rhs?):
-            return lhs.required == rhs.required
+            lhs.required == rhs.required
                 && lhs.expectedFingerprint == rhs.expectedFingerprint
                 && lhs.allowTOFU == rhs.allowTOFU
                 && lhs.storeKey == rhs.storeKey
         default:
-            return false
+            false
         }
     }
 
@@ -809,7 +809,7 @@ final class GatewayConnectionController {
     // Manual gateway connections carry an explicit TLS choice from the user or setup code.
     // Do not silently upgrade based on the host, or ws:// LAN gateways become unreachable.
     private func resolveManualUseTLS(host _: String, useTLS: Bool) -> Bool {
-        return useTLS
+        useTLS
     }
 
     private func shouldRequireTLS(host: String) -> Bool {
@@ -831,12 +831,12 @@ final class GatewayConnectionController {
         let displayName = self.resolvedDisplayName(defaults: defaults)
         let resolvedClientId = self.resolvedClientId(defaults: defaults, stableID: stableID)
 
-        return GatewayConnectOptions(
+        return await GatewayConnectOptions(
             role: "node",
             scopes: [],
             caps: self.currentCaps(),
             commands: self.currentCommands(),
-            permissions: await self.currentPermissions(),
+            permissions: self.currentPermissions(),
             clientId: resolvedClientId,
             clientMode: "node",
             clientDisplayName: displayName)
@@ -1103,8 +1103,8 @@ extension GatewayConnectionController {
         tls: GatewayTLSParams? = nil,
         token: String? = nil,
         bootstrapToken: String? = nil,
-        password: String? = nil
-    ) async {
+        password: String? = nil) async
+    {
         self.startAutoConnect(
             url: url,
             gatewayStableID: gatewayStableID,

@@ -166,120 +166,120 @@ struct OnboardingWizardView: View {
             Text(self.scannerError ?? "")
         }
         .sheet(isPresented: self.$showQRScanner) {
-                NavigationStack {
-                    QRScannerView(
-                        onGatewayLink: { link in
-                            self.handleScannedLink(link)
-                        },
-                        onError: { error in
-                            self.showQRScanner = false
-                            self.statusLine = "Scanner error: \(error)"
-                            self.scannerError = error
-                        },
-                        onDismiss: {
-                            self.showQRScanner = false
-                        })
-                        .ignoresSafeArea()
-                        .navigationTitle("Scan QR Code")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarLeading) {
-                                Button("Cancel") { self.showQRScanner = false }
-                            }
-                            ToolbarItem(placement: .topBarTrailing) {
-                                PhotosPicker(selection: self.$selectedPhoto, matching: .images) {
-                                    Label("Photos", systemImage: "photo")
-                                }
+            NavigationStack {
+                QRScannerView(
+                    onGatewayLink: { link in
+                        self.handleScannedLink(link)
+                    },
+                    onError: { error in
+                        self.showQRScanner = false
+                        self.statusLine = "Scanner error: \(error)"
+                        self.scannerError = error
+                    },
+                    onDismiss: {
+                        self.showQRScanner = false
+                    })
+                    .ignoresSafeArea()
+                    .navigationTitle("Scan QR Code")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Cancel") { self.showQRScanner = false }
+                        }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            PhotosPicker(selection: self.$selectedPhoto, matching: .images) {
+                                Label("Photos", systemImage: "photo")
                             }
                         }
-                }
-                .onChange(of: self.selectedPhoto) { _, newValue in
-                    guard let item = newValue else { return }
-                    self.selectedPhoto = nil
-                    Task {
-                        guard let data = try? await item.loadTransferable(type: Data.self) else {
-                            self.showQRScanner = false
-                            self.scannerError = "Could not load the selected image."
+                    }
+            }
+            .onChange(of: self.selectedPhoto) { _, newValue in
+                guard let item = newValue else { return }
+                self.selectedPhoto = nil
+                Task {
+                    guard let data = try? await item.loadTransferable(type: Data.self) else {
+                        self.showQRScanner = false
+                        self.scannerError = "Could not load the selected image."
+                        return
+                    }
+                    if let message = self.detectQRCode(from: data) {
+                        if let link = GatewayConnectDeepLink.fromSetupInput(message) {
+                            self.handleScannedLink(link)
                             return
                         }
-                        if let message = self.detectQRCode(from: data) {
-                            if let link = GatewayConnectDeepLink.fromSetupInput(message) {
-                                self.handleScannedLink(link)
-                                return
-                            }
-                        }
-                        self.showQRScanner = false
-                        self.scannerError = "No valid QR code found in the selected image."
                     }
+                    self.showQRScanner = false
+                    self.scannerError = "No valid QR code found in the selected image."
                 }
             }
-            .sheet(isPresented: self.$showGatewayProblemDetails) {
-                if let currentProblem = self.currentProblem {
-                    GatewayProblemDetailsSheet(
-                        problem: currentProblem,
-                        primaryActionTitle: self.gatewayProblemPrimaryActionTitle(currentProblem),
-                        onPrimaryAction: {
-                            Task { await self.handleGatewayProblemPrimaryAction(currentProblem) }
-                        })
-                }
+        }
+        .sheet(isPresented: self.$showGatewayProblemDetails) {
+            if let currentProblem = self.currentProblem {
+                GatewayProblemDetailsSheet(
+                    problem: currentProblem,
+                    primaryActionTitle: self.gatewayProblemPrimaryActionTitle(currentProblem),
+                    onPrimaryAction: {
+                        Task { await self.handleGatewayProblemPrimaryAction(currentProblem) }
+                    })
             }
-            .onAppear {
-                self.initializeState()
+        }
+        .onAppear {
+            self.initializeState()
+        }
+        .onDisappear {
+            self.discoveryRestartTask?.cancel()
+            self.discoveryRestartTask = nil
+        }
+        .onChange(of: self.discoveryDomain) { _, _ in
+            self.scheduleDiscoveryRestart()
+        }
+        .onChange(of: self.manualPortText) { _, newValue in
+            let digits = newValue.filter(\.isNumber)
+            if digits != newValue {
+                self.manualPortText = digits
+                return
             }
-            .onDisappear {
-                self.discoveryRestartTask?.cancel()
-                self.discoveryRestartTask = nil
+            guard let parsed = Int(digits), parsed > 0 else {
+                self.manualPort = 0
+                return
             }
-            .onChange(of: self.discoveryDomain) { _, _ in
-                self.scheduleDiscoveryRestart()
+            self.manualPort = min(parsed, 65535)
+        }
+        .onChange(of: self.manualPort) { _, newValue in
+            let normalized = newValue > 0 ? String(newValue) : ""
+            if self.manualPortText != normalized {
+                self.manualPortText = normalized
             }
-            .onChange(of: self.manualPortText) { _, newValue in
-                let digits = newValue.filter(\.isNumber)
-                if digits != newValue {
-                    self.manualPortText = digits
-                    return
-                }
-                guard let parsed = Int(digits), parsed > 0 else {
-                    self.manualPort = 0
-                    return
-                }
-                self.manualPort = min(parsed, 65535)
+        }
+        .onChange(of: self.gatewayToken) { _, newValue in
+            self.saveGatewayCredentials(token: newValue, password: self.gatewayPassword)
+        }
+        .onChange(of: self.gatewayPassword) { _, newValue in
+            self.saveGatewayCredentials(token: self.gatewayToken, password: newValue)
+        }
+        .onChange(of: self.appModel.lastGatewayProblem) { _, newValue in
+            self.updateConnectionIssue(problem: newValue, statusText: self.appModel.gatewayStatusText)
+        }
+        .onChange(of: self.appModel.gatewayStatusText) { _, newValue in
+            self.updateConnectionIssue(problem: self.appModel.lastGatewayProblem, statusText: newValue)
+        }
+        .onChange(of: self.appModel.gatewayServerName) { _, newValue in
+            guard newValue != nil else { return }
+            self.showQRScanner = false
+            self.statusLine = "Connected."
+            if !self.didMarkCompleted, let selectedMode {
+                OnboardingStateStore.markCompleted(mode: selectedMode)
+                self.didMarkCompleted = true
             }
-            .onChange(of: self.manualPort) { _, newValue in
-                let normalized = newValue > 0 ? String(newValue) : ""
-                if self.manualPortText != normalized {
-                    self.manualPortText = normalized
-                }
-            }
-            .onChange(of: self.gatewayToken) { _, newValue in
-                self.saveGatewayCredentials(token: newValue, password: self.gatewayPassword)
-            }
-            .onChange(of: self.gatewayPassword) { _, newValue in
-                self.saveGatewayCredentials(token: self.gatewayToken, password: newValue)
-            }
-            .onChange(of: self.appModel.lastGatewayProblem) { _, newValue in
-                self.updateConnectionIssue(problem: newValue, statusText: self.appModel.gatewayStatusText)
-            }
-            .onChange(of: self.appModel.gatewayStatusText) { _, newValue in
-                self.updateConnectionIssue(problem: self.appModel.lastGatewayProblem, statusText: newValue)
-            }
-            .onChange(of: self.appModel.gatewayServerName) { _, newValue in
-                guard newValue != nil else { return }
-                self.showQRScanner = false
-                self.statusLine = "Connected."
-                if !self.didMarkCompleted, let selectedMode {
-                    OnboardingStateStore.markCompleted(mode: selectedMode)
-                    self.didMarkCompleted = true
-                }
-                self.onClose()
-            }
-            .onChange(of: self.scenePhase) { _, newValue in
-                guard newValue == .active else { return }
-                self.attemptAutomaticPairingResumeIfNeeded()
-            }
-            .onReceive(Self.pairingAutoResumeTicker) { _ in
-                self.attemptAutomaticPairingResumeIfNeeded()
-            }
+            self.onClose()
+        }
+        .onChange(of: self.scenePhase) { _, newValue in
+            guard newValue == .active else { return }
+            self.attemptAutomaticPairingResumeIfNeeded()
+        }
+        .onReceive(Self.pairingAutoResumeTicker) { _ in
+            self.attemptAutomaticPairingResumeIfNeeded()
+        }
     }
 
     private var introStep: some View {

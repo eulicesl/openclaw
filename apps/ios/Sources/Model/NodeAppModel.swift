@@ -696,7 +696,7 @@ final class NodeAppModel {
                     deliveryTo: self.shareDeliveryTo))
         }
         if LiveActivityManager.shared.isActive,
-           (self.activeAgentName != previousAgentName || self.mainSessionKey != previousMainSessionKey)
+           self.activeAgentName != previousAgentName || self.mainSessionKey != previousMainSessionKey
         {
             LiveActivityManager.shared.refreshIdentity(
                 agentName: self.activeAgentName,

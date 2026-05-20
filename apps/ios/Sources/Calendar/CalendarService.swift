@@ -43,11 +43,10 @@ final class CalendarService: CalendarServicing {
     func events(params: OpenClawCalendarEventsParams) async throws -> OpenClawCalendarEventsPayload {
         let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
-        let authorized: Bool
-        if status == .notDetermined || status == .writeOnly {
-            authorized = await Self.requestEventAccess(store: store)
+        let authorized: Bool = if status == .notDetermined || status == .writeOnly {
+            await Self.requestEventAccess(store: store)
         } else {
-            authorized = EventKitAuthorization.allowsRead(status: status)
+            EventKitAuthorization.allowsRead(status: status)
         }
         guard authorized else {
             throw NSError(domain: "Calendar", code: 1, userInfo: [
@@ -81,11 +80,10 @@ final class CalendarService: CalendarServicing {
     func add(params: OpenClawCalendarAddParams) async throws -> OpenClawCalendarAddPayload {
         let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
-        let authorized: Bool
-        if status == .notDetermined {
-            authorized = await Self.requestWriteOnlyEventAccess(store: store)
+        let authorized: Bool = if status == .notDetermined {
+            await Self.requestWriteOnlyEventAccess(store: store)
         } else {
-            authorized = EventKitAuthorization.allowsWrite(status: status)
+            EventKitAuthorization.allowsWrite(status: status)
         }
         guard authorized else {
             throw NSError(domain: "Calendar", code: 2, userInfo: [
@@ -193,7 +191,7 @@ final class CalendarService: CalendarServicing {
 
 #if DEBUG
 extension CalendarService {
-    final class _TestPermissionRequestBox: @unchecked Sendable {
+    final class TestPermissionRequestBox: @unchecked Sendable {
         private let box = PermissionRequestBox()
         private let lock = NSLock()
         private var installWaiters: [CheckedContinuation<Void, Never>] = []

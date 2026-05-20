@@ -9,6 +9,7 @@ struct OpenClawLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 // MARK: Expanded
+
                 DynamicIslandExpandedRegion(.leading) {
                     AgentLabel(agentName: context.attributes.agentName)
                 }
@@ -30,12 +31,15 @@ struct OpenClawLiveActivity: Widget {
                 }
             } compactLeading: {
                 // MARK: Compact Leading
+
                 CompactLeadingView(state: context.state)
             } compactTrailing: {
                 // MARK: Compact Trailing
+
                 CompactTrailingView(state: context.state)
             } minimal: {
                 // MARK: Minimal
+
                 MinimalView(state: context.state)
             }
         }
@@ -49,11 +53,11 @@ private struct LockScreenView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            StatusDot(state: context.state)
+            StatusDot(state: self.context.state)
                 .frame(width: 10, height: 10)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(context.attributes.agentName)
+                Text(self.context.attributes.agentName)
                     .font(.subheadline.bold())
                 if let task = context.state.taskDescription {
                     Text(task)
@@ -61,14 +65,14 @@ private struct LockScreenView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 } else {
-                    Text(context.state.statusText)
+                    Text(self.context.state.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Spacer()
-            TrailingView(state: context.state)
+            TrailingView(state: self.context.state)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
@@ -81,7 +85,7 @@ private struct AgentLabel: View {
     let agentName: String
 
     var body: some View {
-        Label(agentName, systemImage: "cpu")
+        Label(self.agentName, systemImage: "cpu")
             .font(.caption.bold())
             .foregroundStyle(.primary)
             .lineLimit(1)
@@ -93,23 +97,23 @@ private struct ExpandedStatusView: View {
 
     var body: some View {
         Group {
-            if state.isWorking {
+            if self.state.isWorking {
                 HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.mini)
                         .tint(.blue)
-                    Text(state.taskDescription ?? "Working…")
+                    Text(self.state.taskDescription ?? "Working…")
                         .font(.subheadline.weight(.medium))
                         .lineLimit(1)
                 }
             } else {
-                Text(state.statusText)
+                Text(self.state.statusText)
                     .font(.subheadline)
                     .lineLimit(1)
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
-        .animation(.easeInOut(duration: 0.2), value: state.isWorking)
+        .animation(.easeInOut(duration: 0.2), value: self.state.isWorking)
     }
 }
 
@@ -119,12 +123,12 @@ private struct CompactLeadingView: View {
     let state: OpenClawActivityAttributes.ContentState
 
     var body: some View {
-        if state.isWorking {
+        if self.state.isWorking {
             ProgressView()
                 .controlSize(.mini)
                 .tint(.blue)
         } else {
-            StatusDot(state: state)
+            StatusDot(state: self.state)
         }
     }
 }
@@ -133,14 +137,14 @@ private struct CompactTrailingView: View {
     let state: OpenClawActivityAttributes.ContentState
 
     var body: some View {
-        if state.isWorking, let task = state.taskDescription {
+        if self.state.isWorking, let task = state.taskDescription {
             Text(task)
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .frame(maxWidth: 80)
         } else {
-            Text(state.statusText)
+            Text(self.state.statusText)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -153,12 +157,12 @@ private struct MinimalView: View {
     let state: OpenClawActivityAttributes.ContentState
 
     var body: some View {
-        if state.isWorking {
+        if self.state.isWorking {
             ProgressView()
                 .controlSize(.mini)
                 .tint(.blue)
         } else {
-            StatusDot(state: state)
+            StatusDot(state: self.state)
         }
     }
 }
@@ -170,17 +174,17 @@ private struct TrailingView: View {
 
     var body: some View {
         Group {
-            if state.isConnecting {
+            if self.state.isConnecting {
                 ProgressView().controlSize(.small)
-            } else if state.isDisconnected {
+            } else if self.state.isDisconnected {
                 Image(systemName: "wifi.slash")
                     .foregroundStyle(.red)
-            } else if state.isWorking {
+            } else if self.state.isWorking {
                 // Elapsed timer shows how long the agent has been working.
-                Text(state.startedAt, style: .timer)
+                Text(self.state.startedAt, style: .timer)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
-            } else if state.isIdle {
+            } else if self.state.isIdle {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .foregroundStyle(.green)
             }
@@ -193,15 +197,15 @@ private struct StatusDot: View {
 
     var body: some View {
         Circle()
-            .fill(dotColor)
+            .fill(self.dotColor)
             .frame(width: 6, height: 6)
     }
 
     private var dotColor: Color {
-        if state.isDisconnected { return .red }
-        if state.isConnecting { return .gray }
-        if state.isWorking { return .blue }
-        if state.isIdle { return .green }
+        if self.state.isDisconnected { return .red }
+        if self.state.isConnecting { return .gray }
+        if self.state.isWorking { return .blue }
+        if self.state.isIdle { return .green }
         return .secondary
     }
 }

@@ -260,7 +260,7 @@ public final class OpenClawChatViewModel {
                 pendingOptimisticIds: self.pendingOptimisticMessageIds)
             self.sessionId = payload.sessionId
             // Clear optimistic flags for messages now confirmed in history.
-            let confirmedIds = Set(decodedMessages.map { $0.id })
+            let confirmedIds = Set(decodedMessages.map(\.id))
             self.pendingOptimisticMessageIds = self.pendingOptimisticMessageIds.intersection(confirmedIds)
             if !self.prefersExplicitThinkingLevel,
                let level = Self.normalizedThinkingLevel(payload.thinkingLevel)
@@ -437,9 +437,10 @@ public final class OpenClawChatViewModel {
             }
         }
 
-        let trailingUserMessages = (lastMatchedPreviousIndex != nil
-            ? previous.suffix(from: previous.index(after: lastMatchedPreviousIndex!))
-            : ArraySlice(previous))
+        let trailingUserMessages = (
+            lastMatchedPreviousIndex != nil
+                ? previous.suffix(from: previous.index(after: lastMatchedPreviousIndex!))
+                : ArraySlice(previous))
             .filter { message in
                 guard message.role.lowercased() == "user" else { return false }
                 guard let key = Self.userRefreshIdentityKey(for: message) else { return false }
@@ -455,7 +456,7 @@ public final class OpenClawChatViewModel {
         // Preserve messages optimistically appended before history confirmed them.
         // This prevents drops during the race window between append and history refresh.
         if !pendingOptimisticIds.isEmpty {
-            let incomingIds = Set(reconciled.map { $0.id })
+            let incomingIds = Set(reconciled.map(\.id))
             let toPreserve = previous.filter {
                 pendingOptimisticIds.contains($0.id) && !incomingIds.contains($0.id)
             }
@@ -1349,7 +1350,7 @@ public final class OpenClawChatViewModel {
                 pendingOptimisticIds: self.pendingOptimisticMessageIds)
             self.sessionId = payload.sessionId
             // Clear optimistic flags for messages now confirmed in history.
-            let confirmedIds = Set(decodedMessages.map { $0.id })
+            let confirmedIds = Set(decodedMessages.map(\.id))
             self.pendingOptimisticMessageIds = self.pendingOptimisticMessageIds.intersection(confirmedIds)
             if !self.prefersExplicitThinkingLevel,
                let level = Self.normalizedThinkingLevel(payload.thinkingLevel)

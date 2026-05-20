@@ -120,8 +120,9 @@ struct SettingsTab: View {
                                     Text("Connect with setup code")
                                 }
                             }
-                            .disabled(self.connectingGatewayID != nil
-                                || self.setupCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(
+                                self.connectingGatewayID != nil
+                                    || self.setupCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                             if let status = self.setupStatusLine {
                                 Text(status)
@@ -214,9 +215,10 @@ struct SettingsTab: View {
                                     Text("Connect (Manual)")
                                 }
                             }
-                            .disabled(self.connectingGatewayID != nil || self.manualGatewayHost
-                                .trimmingCharacters(in: .whitespacesAndNewlines)
-                                .isEmpty || !self.manualPortIsValid)
+                            .disabled(
+                                self.connectingGatewayID != nil || self.manualGatewayHost
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .isEmpty || !self.manualPortIsValid)
 
                             Text(
                                 "Use this when mDNS/Bonjour discovery is blocked. "
@@ -481,91 +483,91 @@ struct SettingsTab: View {
                 Text(self.scannerError ?? "")
             }
             .onAppear {
-                    self.lastLocationModeRaw = self.locationEnabledModeRaw
-                    self.syncManualPortText()
-                    let trimmedInstanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmedInstanceId.isEmpty {
-                        self.gatewayToken = GatewaySettingsStore.loadGatewayToken(instanceId: trimmedInstanceId) ?? ""
-                        self.gatewayPassword = GatewaySettingsStore
-                            .loadGatewayPassword(instanceId: trimmedInstanceId) ?? ""
-                    }
-                    self.defaultShareInstruction = ShareToAgentSettings.loadDefaultInstruction()
-                    self.appModel.refreshLastShareEventFromRelay()
-                    // Keep setup front-and-center when disconnected; keep things compact once connected.
-                    self.gatewayExpanded = !self.isGatewayConnected
-                    self.selectedAgentPickerId = self.appModel.selectedAgentId ?? ""
-                    if self.isGatewayConnected {
-                        self.appModel.reloadTalkConfig()
-                    }
+                self.lastLocationModeRaw = self.locationEnabledModeRaw
+                self.syncManualPortText()
+                let trimmedInstanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedInstanceId.isEmpty {
+                    self.gatewayToken = GatewaySettingsStore.loadGatewayToken(instanceId: trimmedInstanceId) ?? ""
+                    self.gatewayPassword = GatewaySettingsStore
+                        .loadGatewayPassword(instanceId: trimmedInstanceId) ?? ""
                 }
-                .onChange(of: self.selectedAgentPickerId) { _, newValue in
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    self.appModel.setSelectedAgentId(trimmed.isEmpty ? nil : trimmed)
+                self.defaultShareInstruction = ShareToAgentSettings.loadDefaultInstruction()
+                self.appModel.refreshLastShareEventFromRelay()
+                // Keep setup front-and-center when disconnected; keep things compact once connected.
+                self.gatewayExpanded = !self.isGatewayConnected
+                self.selectedAgentPickerId = self.appModel.selectedAgentId ?? ""
+                if self.isGatewayConnected {
+                    self.appModel.reloadTalkConfig()
                 }
-                .onChange(of: self.appModel.selectedAgentId ?? "") { _, newValue in
-                    if newValue != self.selectedAgentPickerId {
-                        self.selectedAgentPickerId = newValue
-                    }
+            }
+            .onChange(of: self.selectedAgentPickerId) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.appModel.setSelectedAgentId(trimmed.isEmpty ? nil : trimmed)
+            }
+            .onChange(of: self.appModel.selectedAgentId ?? "") { _, newValue in
+                if newValue != self.selectedAgentPickerId {
+                    self.selectedAgentPickerId = newValue
                 }
-                .onChange(of: self.preferredGatewayStableID) { _, newValue in
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    GatewaySettingsStore.savePreferredGatewayStableID(trimmed)
+            }
+            .onChange(of: self.preferredGatewayStableID) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                GatewaySettingsStore.savePreferredGatewayStableID(trimmed)
+            }
+            .onChange(of: self.gatewayToken) { _, newValue in
+                guard !self.suppressCredentialPersist else { return }
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let instanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !instanceId.isEmpty else { return }
+                GatewaySettingsStore.saveGatewayToken(trimmed, instanceId: instanceId)
+            }
+            .onChange(of: self.gatewayPassword) { _, newValue in
+                guard !self.suppressCredentialPersist else { return }
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let instanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !instanceId.isEmpty else { return }
+                GatewaySettingsStore.saveGatewayPassword(trimmed, instanceId: instanceId)
+            }
+            .onChange(of: self.defaultShareInstruction) { _, newValue in
+                ShareToAgentSettings.saveDefaultInstruction(newValue)
+            }
+            .onChange(of: self.manualGatewayPort) { _, _ in
+                self.syncManualPortText()
+            }
+            .onChange(of: self.appModel.gatewayServerName) { _, newValue in
+                if newValue != nil {
+                    self.setupCode = ""
+                    self.setupStatusText = nil
+                    return
                 }
-                .onChange(of: self.gatewayToken) { _, newValue in
-                    guard !self.suppressCredentialPersist else { return }
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let instanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !instanceId.isEmpty else { return }
-                    GatewaySettingsStore.saveGatewayToken(trimmed, instanceId: instanceId)
+                if self.manualGatewayEnabled {
+                    self.setupStatusText = self.appModel.gatewayStatusText
                 }
-                .onChange(of: self.gatewayPassword) { _, newValue in
-                    guard !self.suppressCredentialPersist else { return }
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let instanceId = self.instanceId.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !instanceId.isEmpty else { return }
-                    GatewaySettingsStore.saveGatewayPassword(trimmed, instanceId: instanceId)
-                }
-                .onChange(of: self.defaultShareInstruction) { _, newValue in
-                    ShareToAgentSettings.saveDefaultInstruction(newValue)
-                }
-                .onChange(of: self.manualGatewayPort) { _, _ in
-                    self.syncManualPortText()
-                }
-                .onChange(of: self.appModel.gatewayServerName) { _, newValue in
-                    if newValue != nil {
-                        self.setupCode = ""
-                        self.setupStatusText = nil
+            }
+            .onChange(of: self.appModel.gatewayStatusText) { _, newValue in
+                guard self.manualGatewayEnabled || self.connectingGatewayID == "manual" else { return }
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                self.setupStatusText = trimmed
+            }
+            .onChange(of: self.locationEnabledModeRaw) { _, newValue in
+                let previous = self.lastLocationModeRaw
+                self.lastLocationModeRaw = newValue
+                guard let mode = OpenClawLocationMode(rawValue: newValue) else { return }
+                Task {
+                    let granted = await self.appModel.requestLocationPermissions(mode: mode)
+                    if !granted {
+                        await MainActor.run {
+                            self.locationEnabledModeRaw = previous
+                            self.lastLocationModeRaw = previous
+                        }
                         return
                     }
-                    if self.manualGatewayEnabled {
-                        self.setupStatusText = self.appModel.gatewayStatusText
+                    await MainActor.run {
+                        self.gatewayController.refreshActiveGatewayRegistrationFromSettings()
                     }
                 }
-                .onChange(of: self.appModel.gatewayStatusText) { _, newValue in
-                    guard self.manualGatewayEnabled || self.connectingGatewayID == "manual" else { return }
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    self.setupStatusText = trimmed
-                }
-                .onChange(of: self.locationEnabledModeRaw) { _, newValue in
-                    let previous = self.lastLocationModeRaw
-                    self.lastLocationModeRaw = newValue
-                    guard let mode = OpenClawLocationMode(rawValue: newValue) else { return }
-                    Task {
-                        let granted = await self.appModel.requestLocationPermissions(mode: mode)
-                        if !granted {
-                            await MainActor.run {
-                                self.locationEnabledModeRaw = previous
-                                self.lastLocationModeRaw = previous
-                            }
-                            return
-                        }
-                        await MainActor.run {
-                            self.gatewayController.refreshActiveGatewayRegistrationFromSettings()
-                        }
-                    }
-                }
+            }
         }
         .gatewayTrustPromptAlert()
     }

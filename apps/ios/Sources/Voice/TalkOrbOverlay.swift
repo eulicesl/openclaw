@@ -14,7 +14,7 @@ private struct TalkStatusCapsuleModifier: ViewModifier {
 
     @ViewBuilder
     private func applyBackground(to content: Content) -> some View {
-#if compiler(>=6.2)
+        #if compiler(>=6.2)
         if #available(iOS 26, *) {
             // iOS 26+: native Liquid Glass capsule — tinted with the gateway seam color.
             content
@@ -22,9 +22,9 @@ private struct TalkStatusCapsuleModifier: ViewModifier {
         } else {
             self.legacyBackground(content)
         }
-#else
+        #else
         self.legacyBackground(content)
-#endif
+        #endif
     }
 
     private func legacyBackground(_ content: Content) -> some View {
@@ -34,9 +34,7 @@ private struct TalkStatusCapsuleModifier: ViewModifier {
                 Capsule()
                     .fill(Color.black.opacity(0.40))
                     .overlay(
-                        Capsule().stroke(seam.opacity(0.22), lineWidth: 1)
-                    )
-            )
+                        Capsule().stroke(self.seam.opacity(0.22), lineWidth: 1)))
     }
 }
 

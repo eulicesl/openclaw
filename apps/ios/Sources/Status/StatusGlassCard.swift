@@ -21,21 +21,20 @@ private struct StatusGlassBackgroundModifier: ViewModifier {
 
     @ViewBuilder
     private func applyBackground(to content: Content) -> some View {
-#if compiler(>=6.2)
+        #if compiler(>=6.2)
         if #available(iOS 26, *) {
             // iOS 26+: native Liquid Glass — the framework handles translucency,
             // vibrancy, and color adaptation automatically.
             content
                 .glassEffect(
                     .regular,
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         } else {
             self.legacyBackground(content)
         }
-#else
+        #else
         self.legacyBackground(content)
-#endif
+        #endif
     }
 
     private func legacyBackground(_ content: Content) -> some View {
