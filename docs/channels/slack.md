@@ -130,6 +130,9 @@ Base manifest (Socket Mode default):
   },
   "features": {
     "bot_user": { "display_name": "OpenClaw", "always_online": true },
+    "assistant_view": {
+      "assistant_description": "OpenClaw assistant for team operations"
+    },
     "app_home": {
       "messages_tab_enabled": true,
       "messages_tab_read_only_enabled": false
@@ -182,6 +185,8 @@ Base manifest (Socket Mode default):
         "message.groups",
         "message.im",
         "message.mpim",
+        "assistant_thread_started",
+        "assistant_thread_context_changed",
         "pin_added",
         "pin_removed",
         "reaction_added",

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createSlackRoomProcessingIndicator,
   createSlackTurnDeliveryTracker,
   isSlackStreamingEnabled,
   resolveSlackDisableBlockStreaming,
@@ -92,6 +93,82 @@ describe("slack native streaming recipient team", () => {
         fallbackTeamId: "T_LOCAL",
       }),
     ).toBe("T_LOCAL");
+  });
+});
+
+describe("slack room processing indicator", () => {
+  it("posts and deletes a threaded processing message for room requests", async () => {
+    const postMessage = vi.fn(async () => ({ ts: "171234.999" }));
+    const deleteMessage = vi.fn(async () => ({}));
+    const indicator = createSlackRoomProcessingIndicator({
+      enabled: true,
+      client: { chat: { postMessage, delete: deleteMessage } },
+      token: "xoxb-test",
+      channel: "C123",
+      threadTs: "171234.111",
+    });
+
+    await indicator.start();
+    await indicator.stop();
+
+    expect(postMessage).toHaveBeenCalledWith({
+      token: "xoxb-test",
+      channel: "C123",
+      thread_ts: "171234.111",
+      text: "J.A.R.V.I.S. is processing...",
+      blocks: [
+        {
+          type: "context",
+          elements: [{ type: "mrkdwn", text: "*J.A.R.V.I.S.* is processing..." }],
+        },
+      ],
+    });
+    expect(deleteMessage).toHaveBeenCalledWith({
+      token: "xoxb-test",
+      channel: "C123",
+      ts: "171234.999",
+    });
+  });
+
+  it("stays silent without a room thread target", async () => {
+    const postMessage = vi.fn(async () => ({ ts: "171234.999" }));
+    const deleteMessage = vi.fn(async () => ({}));
+    const indicator = createSlackRoomProcessingIndicator({
+      enabled: true,
+      client: { chat: { postMessage, delete: deleteMessage } },
+      token: "xoxb-test",
+      channel: "C123",
+    });
+
+    await indicator.start();
+    await indicator.stop();
+
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it("logs and continues when Slack rejects the processing message", async () => {
+    const log = vi.fn();
+    const postMessage = vi.fn(async () => {
+      throw new Error("missing_scope");
+    });
+    const deleteMessage = vi.fn(async () => ({}));
+    const indicator = createSlackRoomProcessingIndicator({
+      enabled: true,
+      client: { chat: { postMessage, delete: deleteMessage } },
+      token: "xoxb-test",
+      channel: "C123",
+      threadTs: "171234.111",
+      log,
+    });
+
+    await indicator.start();
+    await indicator.stop();
+
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("slack: processing indicator post failed"),
+    );
+    expect(deleteMessage).not.toHaveBeenCalled();
   });
 });
 

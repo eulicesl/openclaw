@@ -158,6 +158,75 @@ type SlackTurnDeliveryAttempt = {
   textOverride?: string;
 };
 
+type SlackProcessingIndicatorClient = {
+  chat: {
+    postMessage: (params: {
+      token: string;
+      channel: string;
+      thread_ts: string;
+      text: string;
+      blocks: Array<{
+        type: "context";
+        elements: Array<{ type: "mrkdwn"; text: string }>;
+      }>;
+    }) => Promise<{ ts?: string }>;
+    delete: (params: { token: string; channel: string; ts: string }) => Promise<unknown>;
+  };
+};
+
+export function createSlackRoomProcessingIndicator(params: {
+  enabled: boolean;
+  client: SlackProcessingIndicatorClient;
+  token: string;
+  channel: string;
+  threadTs?: string;
+  log?: (message: string) => void;
+}) {
+  let processingTs: string | undefined;
+
+  return {
+    async start() {
+      if (!params.enabled || !params.threadTs || processingTs) {
+        return;
+      }
+      try {
+        const chatPostMessage = params.client.chat.postMessage;
+        const result = await chatPostMessage({
+          token: params.token,
+          channel: params.channel,
+          thread_ts: params.threadTs,
+          text: "J.A.R.V.I.S. is processing...",
+          blocks: [
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: "*J.A.R.V.I.S.* is processing..." }],
+            },
+          ],
+        });
+        processingTs = result.ts;
+      } catch (err) {
+        params.log?.(`slack: processing indicator post failed (${formatErrorMessage(err)})`);
+      }
+    },
+    async stop() {
+      if (!processingTs) {
+        return;
+      }
+      const ts = processingTs;
+      processingTs = undefined;
+      try {
+        await params.client.chat.delete({
+          token: params.token,
+          channel: params.channel,
+          ts,
+        });
+      } catch (err) {
+        params.log?.(`slack: processing indicator delete failed (${formatErrorMessage(err)})`);
+      }
+    },
+  };
+}
+
 function buildSlackTurnDeliveryKey(params: SlackTurnDeliveryAttempt): string | null {
   const reply = resolveSendableOutboundReplyParts(params.payload, {
     text: params.textOverride,
@@ -352,6 +421,14 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
 
   const typingTarget = statusThreadTs ? `${message.channel}/${statusThreadTs}` : message.channel;
   const typingReaction = ctx.typingReaction;
+  const processingIndicator = createSlackRoomProcessingIndicator({
+    enabled: prepared.isRoomish,
+    client: ctx.app.client,
+    token: ctx.botToken,
+    channel: message.channel,
+    threadTs: statusThreadTs,
+    log: logVerbose,
+  });
   const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
     cfg,
     agentId: route.agentId,
@@ -369,6 +446,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
           threadTs: statusThreadTs,
           status: "is typing...",
         });
+        await processingIndicator.start();
         if (typingReaction && message.ts) {
           await reactSlackMessage(message.channel, message.ts, typingReaction, {
             token: ctx.botToken,
@@ -386,6 +464,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
           threadTs: statusThreadTs,
           status: "",
         });
+        await processingIndicator.stop();
         if (typingReaction && message.ts) {
           await removeSlackReaction(message.channel, message.ts, typingReaction, {
             token: ctx.botToken,
@@ -1035,6 +1114,7 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
   } finally {
     await draftStream?.discardPending();
     markDispatchIdle();
+    await processingIndicator.stop();
   }
 
   // -----------------------------------------------------------------------
